@@ -3,6 +3,10 @@ import {
   getOutCategories, getInCategories,
   PROTECTED_OUT_CATEGORIES
 } from '../data.js';
+import {
+  isSuperadmin, listUsers, createAppUser, setUserActive, removeUser,
+  authErrorMessage, SUPERADMIN_EMAIL, currentUser
+} from '../auth.js';
 
 let _renderAll;
 
@@ -15,6 +19,15 @@ export function init(renderAll) {
       if (e.key !== 'Enter') return;
       e.preventDefault();
       addCategory(id === 'newOutCategory' ? 'out' : 'in');
+    });
+  });
+  ['newUserName', 'newUserEmail', 'newUserPassword'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      addUser();
     });
   });
 }
@@ -66,9 +79,69 @@ function renderList(kind) {
   el.innerHTML = `<table><thead><tr><th>Category</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
+async function renderUsers() {
+  const card = document.getElementById('settingsUsersCard');
+  const listEl = document.getElementById('settingsUsersList');
+  if (!card || !listEl) return;
+
+  if (!isSuperadmin()) {
+    card.hidden = true;
+    return;
+  }
+  card.hidden = false;
+
+  try {
+    const users = await listUsers();
+    if (!users.length) {
+      listEl.innerHTML = `<div class="empty-state" style="padding:20px">No users yet. Add someone above.</div>`;
+      return;
+    }
+    const rows = users.map(u => {
+      const isSA = u.role === 'superadmin' || String(u.email || '').toLowerCase() === SUPERADMIN_EMAIL;
+      const isSelf = currentUser && u.uid === currentUser.uid;
+      const active = u.active !== false;
+      const roleBadge = isSA
+        ? `<span class="badge" style="background:var(--accent-light);color:var(--accent)">Superadmin</span>`
+        : `<span class="badge" style="background:var(--gray-bg);color:var(--gray)">User</span>`;
+      const statusBadge = active
+        ? `<span class="badge" style="background:var(--green-bg);color:var(--green)">Active</span>`
+        : `<span class="badge" style="background:var(--red-bg);color:var(--red)">Inactive</span>`;
+
+      let actions = '';
+      if (!isSA && !isSelf) {
+        actions = active
+          ? `<button class="btn small secondary" onclick="toggleUserActive('${u.uid}', false)">Deactivate</button>
+             <button class="btn small danger" onclick="deleteUser('${u.uid}')">Remove</button>`
+          : `<button class="btn small secondary" onclick="toggleUserActive('${u.uid}', true)">Reactivate</button>
+             <button class="btn small danger" onclick="deleteUser('${u.uid}')">Remove</button>`;
+      } else if (isSA) {
+        actions = `<span style="color:var(--text-muted);font-size:12px">Protected</span>`;
+      }
+
+      return `<tr>
+        <td>
+          <strong>${escapeHtml(u.name || '—')}</strong>
+          <div style="color:var(--text-muted);font-size:11.5px">${escapeHtml(u.email || '')}</div>
+        </td>
+        <td>${roleBadge}</td>
+        <td>${statusBadge}</td>
+        <td class="actions">${actions}</td>
+      </tr>`;
+    }).join('');
+
+    listEl.innerHTML = `<table>
+      <thead><tr><th>User</th><th>Role</th><th>Status</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  } catch (err) {
+    listEl.innerHTML = `<div class="empty-state" style="padding:20px;color:var(--red)">${escapeHtml(authErrorMessage(err))}</div>`;
+  }
+}
+
 export function render() {
   renderList('out');
   renderList('in');
+  renderUsers();
 }
 
 export function addCategory(kind) {
@@ -103,7 +176,6 @@ export function renameCategory(kind, index) {
     return;
   }
 
-  // Keep Salary/Dividend names if they're protected — allow rename but warn if used by system features
   if (kind === 'out' && PROTECTED_OUT_CATEGORIES.includes(oldName) && name !== oldName) {
     if (!confirm(`"${oldName}" is used by payroll/dividends. Renaming it will break those features unless you rename it back. Continue?`)) {
       return;
@@ -140,4 +212,42 @@ export function deleteCategory(kind, index) {
   list.splice(index, 1);
   save();
   _renderAll();
+}
+
+export async function addUser() {
+  if (!isSuperadmin()) { alert('Only the superadmin can add users.'); return; }
+  const name = document.getElementById('newUserName').value.trim();
+  const email = document.getElementById('newUserEmail').value.trim();
+  const password = document.getElementById('newUserPassword').value;
+  if (!email || !password) { alert('Email and temporary password are required.'); return; }
+
+  try {
+    await createAppUser({ email, password, name });
+    document.getElementById('newUserName').value = '';
+    document.getElementById('newUserEmail').value = '';
+    document.getElementById('newUserPassword').value = '';
+    await renderUsers();
+    alert(`User created. Share the email and temporary password with them so they can sign in.`);
+  } catch (err) {
+    alert(authErrorMessage(err));
+  }
+}
+
+export async function toggleUserActive(uid, active) {
+  try {
+    await setUserActive(uid, active);
+    await renderUsers();
+  } catch (err) {
+    alert(authErrorMessage(err));
+  }
+}
+
+export async function deleteUser(uid) {
+  if (!confirm('Remove this user? They will no longer be able to sign in to JuanPMT.')) return;
+  try {
+    await removeUser(uid);
+    await renderUsers();
+  } catch (err) {
+    alert(authErrorMessage(err));
+  }
 }

@@ -8,24 +8,65 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
 </head>
 <body>
-<div id="app">
+
+<!-- LOGIN -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <div class="login-brand">
+      <h1>JuanPMT</h1>
+      <p>Sign in to continue</p>
+    </div>
+    <div id="loginError" class="login-error" hidden></div>
+    <form id="loginForm" autocomplete="on">
+      <div class="field">
+        <label for="loginEmail">Email</label>
+        <input type="email" id="loginEmail" required autocomplete="username" placeholder="you@example.com">
+      </div>
+      <div class="field">
+        <label for="loginPassword">Password</label>
+        <input type="password" id="loginPassword" required autocomplete="current-password" minlength="6" placeholder="••••••••">
+      </div>
+      <div class="field" id="loginNameField" hidden>
+        <label for="loginName">Display name</label>
+        <input type="text" id="loginName" autocomplete="name" placeholder="Your name">
+      </div>
+      <button type="submit" class="btn login-submit" id="loginSubmitBtn">Sign in</button>
+    </form>
+    <div class="login-links">
+      <button type="button" class="linkish" id="toggleRegisterBtn">Create superadmin account</button>
+      <button type="button" class="linkish" id="forgotPasswordBtn">Forgot password?</button>
+    </div>
+    <p class="login-hint">Access is invite-only. Ask your superadmin to add you in Settings → Users.</p>
+  </div>
+</div>
+
+<div id="app" hidden>
   <header class="top">
     <div>
       <h1>JuanPMT</h1>
       <div class="sub">Project management &mdash; projects, tasks, timeline, team, budget, finance, leads &amp; settings</div>
     </div>
-    <nav class="tabs" id="tabs">
-      <button data-tab="overview" class="active">Overview</button>
-      <button data-tab="projects">Projects</button>
-      <button data-tab="tasks">Tasks</button>
-      <button data-tab="timeline">Timeline</button>
-      <button data-tab="team">Team</button>
-      <button data-tab="budget">Budget</button>
-      <button data-tab="finance">Finance</button>
-      <button data-tab="leads">Leads</button>
-      <button data-tab="partners">Partners</button>
-      <button data-tab="settings">Settings</button>
-    </nav>
+    <div class="header-right">
+      <nav class="tabs" id="tabs">
+        <button data-tab="overview" class="active">Overview</button>
+        <button data-tab="projects">Projects</button>
+        <button data-tab="tasks">Tasks</button>
+        <button data-tab="timeline">Timeline</button>
+        <button data-tab="team">Team</button>
+        <button data-tab="budget">Budget</button>
+        <button data-tab="finance">Finance</button>
+        <button data-tab="leads">Leads</button>
+        <button data-tab="partners">Partners</button>
+        <button data-tab="settings">Settings</button>
+      </nav>
+      <div class="user-chip" id="userChip">
+        <div class="user-chip-text">
+          <strong id="userChipName">—</strong>
+          <span id="userChipEmail"></span>
+        </div>
+        <button type="button" class="btn small secondary" id="logoutBtn">Log out</button>
+      </div>
+    </div>
   </header>
 
   <!-- OVERVIEW -->
@@ -161,6 +202,23 @@
 
   <!-- SETTINGS -->
   <section class="panel" id="panel-settings">
+    <div class="card" id="settingsUsersCard" style="margin-bottom:16px" hidden>
+      <h2>Users</h2>
+      <p style="margin:0 0 12px;color:var(--text-muted);font-size:13px;line-height:1.45">
+        Add people who can sign in. Only the superadmin can manage users.
+        New users get an email and temporary password you set here.
+      </p>
+      <div class="toolbar" style="margin-bottom:12px">
+        <div class="filters" style="flex:1;flex-wrap:wrap">
+          <input type="text" id="newUserName" placeholder="Name" style="min-width:140px">
+          <input type="email" id="newUserEmail" placeholder="Email" style="min-width:180px">
+          <input type="password" id="newUserPassword" placeholder="Temp password" minlength="6" style="min-width:140px">
+        </div>
+        <button class="btn" onclick="addUser()">+ Add user</button>
+      </div>
+      <div id="settingsUsersList"></div>
+    </div>
+
     <div class="card" style="margin-bottom:16px">
       <h2>Transaction categories</h2>
       <p style="margin:0;color:var(--text-muted);font-size:13px;line-height:1.45">
