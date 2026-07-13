@@ -12,7 +12,7 @@
   <header class="top">
     <div>
       <h1>JuanPMT</h1>
-      <div class="sub">Project management &mdash; projects, tasks, timeline, team, budget, finance &amp; leads</div>
+      <div class="sub">Project management &mdash; projects, tasks, timeline, team, budget, finance, leads &amp; settings</div>
     </div>
     <nav class="tabs" id="tabs">
       <button data-tab="overview" class="active">Overview</button>
@@ -24,6 +24,7 @@
       <button data-tab="finance">Finance</button>
       <button data-tab="leads">Leads</button>
       <button data-tab="partners">Partners</button>
+      <button data-tab="settings">Settings</button>
     </nav>
   </header>
 
@@ -156,6 +157,39 @@
       </div>
     </div>
     <div class="card"><div id="partnersTable"></div></div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="panel" id="panel-settings">
+    <div class="card" style="margin-bottom:16px">
+      <h2>Transaction categories</h2>
+      <p style="margin:0;color:var(--text-muted);font-size:13px;line-height:1.45">
+        Customize the categories available when logging income (In) or expenses (Out).
+        Salary and Dividend are system categories used by payroll and partner dividends.
+      </p>
+    </div>
+    <div class="card-row">
+      <div class="card">
+        <h2>Expense categories (Out)</h2>
+        <div class="toolbar" style="margin-bottom:12px">
+          <div class="filters" style="flex:1">
+            <input type="text" id="newOutCategory" placeholder="New expense category" style="min-width:180px;flex:1">
+          </div>
+          <button class="btn" onclick="addCategory('out')">+ Add</button>
+        </div>
+        <div id="settingsOutCategories"></div>
+      </div>
+      <div class="card">
+        <h2>Income categories (In)</h2>
+        <div class="toolbar" style="margin-bottom:12px">
+          <div class="filters" style="flex:1">
+            <input type="text" id="newInCategory" placeholder="New income category" style="min-width:180px;flex:1">
+          </div>
+          <button class="btn" onclick="addCategory('in')">+ Add</button>
+        </div>
+        <div id="settingsInCategories"></div>
+      </div>
+    </div>
   </section>
 
   <footer class="hint">Data syncs across all your devices via the cloud. ☁️</footer>
