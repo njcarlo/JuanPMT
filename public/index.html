@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JuanPMT</title>
+<link rel="stylesheet" href="css/styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <div>
+      <h1>JuanPMT</h1>
+      <div class="sub">Project management &mdash; projects, tasks, timeline, team, budget, finance &amp; leads</div>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button data-tab="overview" class="active">Overview</button>
+      <button data-tab="projects">Projects</button>
+      <button data-tab="tasks">Tasks</button>
+      <button data-tab="timeline">Timeline</button>
+      <button data-tab="team">Team</button>
+      <button data-tab="budget">Budget</button>
+      <button data-tab="finance">Finance</button>
+      <button data-tab="leads">Leads</button>
+      <button data-tab="partners">Partners</button>
+    </nav>
+  </header>
+
+  <!-- OVERVIEW -->
+  <section class="panel active" id="panel-overview">
+    <div class="kpi-grid" id="kpiGrid"></div>
+    <div class="card-row">
+      <div class="card"><h2>Tasks by status</h2><div class="chart-wrap"><canvas id="chartTaskStatus"></canvas></div></div>
+      <div class="card"><h2>Budget vs. spent by project</h2><div class="chart-wrap"><canvas id="chartBudget"></canvas></div></div>
+    </div>
+    <div class="card"><h2>Upcoming &amp; overdue tasks (next 14 days)</h2><div id="upcomingTasksTable"></div></div>
+  </section>
+
+  <!-- PROJECTS -->
+  <section class="panel" id="panel-projects">
+    <div class="toolbar">
+      <div class="filters">
+        <select id="projStatusFilter">
+          <option value="">All statuses</option>
+          <option>Active</option><option>On Hold</option><option>At Risk</option><option>Completed</option>
+        </select>
+      </div>
+      <button class="btn" onclick="openProjectModal()">+ New Project</button>
+    </div>
+    <div class="card"><div id="projectsTable"></div></div>
+  </section>
+
+  <!-- TASKS -->
+  <section class="panel" id="panel-tasks">
+    <div class="toolbar">
+      <div class="filters">
+        <select id="taskProjectFilter"><option value="">All projects</option></select>
+        <select id="taskOwnerFilter"><option value="">All owners</option></select>
+        <select id="taskStatusFilter">
+          <option value="">All statuses</option>
+          <option>To Do</option><option>In Progress</option><option>Review</option><option>Done</option>
+        </select>
+      </div>
+      <button class="btn" onclick="openTaskModal()">+ New Task</button>
+    </div>
+    <div class="card"><div id="tasksTable"></div></div>
+  </section>
+
+  <!-- TIMELINE -->
+  <section class="panel" id="panel-timeline">
+    <div class="card">
+      <h2>Project timeline</h2>
+      <div class="timeline-wrap" id="timelineWrap"></div>
+      <div class="timeline-legend">
+        <span><span class="legend-dot" style="background:var(--blue)"></span>Active</span>
+        <span><span class="legend-dot" style="background:var(--amber)"></span>On Hold</span>
+        <span><span class="legend-dot" style="background:var(--red)"></span>At Risk</span>
+        <span><span class="legend-dot" style="background:var(--green)"></span>Completed</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- TEAM -->
+  <section class="panel" id="panel-team">
+    <div class="toolbar">
+      <div></div>
+      <button class="btn" onclick="openTeamModal()">+ New Team Member</button>
+    </div>
+    <div class="card"><h2>Workload (assigned hours vs. weekly capacity)</h2><div class="chart-wrap"><canvas id="chartWorkload"></canvas></div></div>
+    <div class="card"><div id="teamTable"></div></div>
+  </section>
+
+  <!-- BUDGET -->
+  <section class="panel" id="panel-budget">
+    <div class="kpi-grid" id="budgetKpiGrid"></div>
+    <div class="card"><h2>Budget by project</h2><div id="budgetTable"></div></div>
+  </section>
+
+  <!-- FINANCE -->
+  <section class="panel" id="panel-finance">
+    <div class="kpi-grid" id="financeKpiGrid"></div>
+    <div class="card-row">
+      <div class="card"><h2>In vs. Out</h2><div class="chart-wrap"><canvas id="chartInOut"></canvas></div></div>
+      <div class="card"><h2>Expenses by category</h2><div class="chart-wrap"><canvas id="chartExpenseCategory"></canvas></div></div>
+    </div>
+    <div class="toolbar">
+      <div class="filters">
+        <select id="txnTypeFilter"><option value="">All types</option><option>In</option><option>Out</option></select>
+        <select id="txnCategoryFilter"><option value="">All categories</option></select>
+        <select id="txnProjectFilter"><option value="">All projects</option></select>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn secondary" onclick="runPayroll()">Run Payroll This Month</button>
+        <button class="btn" onclick="openTransactionModal()">+ New Transaction</button>
+      </div>
+    </div>
+    <div class="card"><div id="financeTable"></div></div>
+  </section>
+
+  <!-- LEADS -->
+  <section class="panel" id="panel-leads">
+    <div class="kpi-grid" id="leadsKpiGrid"></div>
+    <div class="card-row">
+      <div class="card"><h2>Leads by status</h2><div class="chart-wrap"><canvas id="chartLeadStatus"></canvas></div></div>
+      <div class="card"><h2>Pipeline value by stage</h2><div class="chart-wrap"><canvas id="chartLeadValue"></canvas></div></div>
+    </div>
+    <div class="toolbar">
+      <div class="filters">
+        <select id="leadStatusFilter">
+          <option value="">All statuses</option>
+          <option>New</option><option>Contacted</option><option>Qualified</option>
+          <option>Proposal</option><option>Won</option><option>Lost</option>
+        </select>
+        <select id="leadSourceFilter">
+          <option value="">All sources</option>
+          <option>Referral</option><option>Website</option><option>Social</option>
+          <option>Cold Outreach</option><option>Event</option><option>Other</option>
+        </select>
+        <select id="leadOwnerFilter"><option value="">All assignees</option></select>
+      </div>
+      <button class="btn" onclick="openLeadModal()">+ New Lead</button>
+    </div>
+    <div class="card"><div id="leadsTable"></div></div>
+  </section>
+
+
+  <!-- PARTNERS -->
+  <section class="panel" id="panel-partners">
+    <div class="kpi-grid" id="partnersKpiGrid"></div>
+    <div class="toolbar">
+      <div></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn secondary" onclick="openRunDividendsModal()">&#x1F4B0; Run Dividends</button>
+        <button class="btn" onclick="openPartnerModal()">+ New Partner</button>
+      </div>
+    </div>
+    <div class="card"><div id="partnersTable"></div></div>
+  </section>
+
+  <footer class="hint">Data syncs across all your devices via the cloud. ☁️</footer>
+</div>
+
+<!-- LEAD MODAL -->
+<div class="modal-overlay" id="leadModalOverlay">
+  <div class="modal">
+    <h3 id="leadModalTitle">New Lead</h3>
+    <input type="hidden" id="leadId">
+    <div class="field-row">
+      <div class="field"><label>Company / Lead name</label><input type="text" id="leadName"></div>
+      <div class="field"><label>Contact person</label><input type="text" id="leadContact"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Email</label><input type="text" id="leadEmail"></div>
+      <div class="field"><label>Phone</label><input type="text" id="leadPhone"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Status</label>
+        <select id="leadStatus"><option>New</option><option>Contacted</option><option>Qualified</option><option>Proposal</option><option>Won</option><option>Lost</option></select>
+      </div>
+      <div class="field"><label>Source</label>
+        <select id="leadSource"><option>Referral</option><option>Website</option><option>Social</option><option>Cold Outreach</option><option>Event</option><option>Other</option></select>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Deal value ($)</label><input type="number" id="leadValue" min="0" step="100"></div>
+      <div class="field"><label>Assigned to</label><select id="leadAssignedTo"></select></div>
+    </div>
+    <div class="field"><label>Notes</label><textarea id="leadNotes" rows="3" style="resize:vertical"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn danger" id="leadDeleteBtn" style="display:none" onclick="deleteLead()">Delete</button>
+      <button class="btn secondary" onclick="closeModal('leadModalOverlay')">Cancel</button>
+      <button class="btn" onclick="saveLead()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- PROJECT MODAL -->
+<div class="modal-overlay" id="projectModalOverlay">
+  <div class="modal">
+    <h3 id="projectModalTitle">New Project</h3>
+    <input type="hidden" id="projectId">
+    <div class="field"><label>Project name</label><input type="text" id="projectName"></div>
+    <div class="field"><label>Client</label><input type="text" id="projectClient"></div>
+    <div class="field-row">
+      <div class="field"><label>Start date</label><input type="date" id="projectStart"></div>
+      <div class="field"><label>End date</label><input type="date" id="projectEnd"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Status</label>
+        <select id="projectStatus"><option>Active</option><option>On Hold</option><option>At Risk</option><option>Completed</option></select>
+      </div>
+      <div class="field"><label>Priority</label>
+        <select id="projectPriority"><option>Low</option><option selected>Medium</option><option>High</option><option>Urgent</option></select>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Budget ($)</label><input type="number" id="projectBudget" min="0" step="100"></div>
+      <div class="field"><label>Spent ($)</label><input type="number" id="projectSpent" min="0" step="100"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn danger" id="projectDeleteBtn" style="display:none" onclick="deleteProject()">Delete</button>
+      <button class="btn secondary" onclick="closeModal('projectModalOverlay')">Cancel</button>
+      <button class="btn" onclick="saveProject()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- TASK MODAL -->
+<div class="modal-overlay" id="taskModalOverlay">
+  <div class="modal">
+    <h3 id="taskModalTitle">New Task</h3>
+    <input type="hidden" id="taskId">
+    <div class="field"><label>Task name</label><input type="text" id="taskName"></div>
+    <div class="field"><label>Project</label><select id="taskProject"></select></div>
+    <div class="field-row">
+      <div class="field"><label>Owner</label><select id="taskOwner"></select></div>
+      <div class="field"><label>Due date</label><input type="date" id="taskDue"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Status</label>
+        <select id="taskStatus"><option>To Do</option><option>In Progress</option><option>Review</option><option>Done</option></select>
+      </div>
+      <div class="field"><label>Priority</label>
+        <select id="taskPriority"><option>Low</option><option selected>Medium</option><option>High</option><option>Urgent</option></select>
+      </div>
+    </div>
+    <div class="field"><label>Estimated hours</label><input type="number" id="taskHours" min="0" step="1"></div>
+    <div class="modal-actions">
+      <button class="btn danger" id="taskDeleteBtn" style="display:none" onclick="deleteTask()">Delete</button>
+      <button class="btn secondary" onclick="closeModal('taskModalOverlay')">Cancel</button>
+      <button class="btn" onclick="saveTask()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- TEAM MODAL -->
+<div class="modal-overlay" id="teamModalOverlay">
+  <div class="modal">
+    <h3 id="teamModalTitle">New Team Member</h3>
+    <input type="hidden" id="teamId">
+    <div class="field"><label>Name</label><input type="text" id="teamName"></div>
+    <div class="field"><label>Role</label><input type="text" id="teamRole"></div>
+    <div class="field-row">
+      <div class="field"><label>Weekly capacity (hours)</label><input type="number" id="teamCapacity" min="0" step="1" value="40"></div>
+      <div class="field"><label>Monthly salary ($)</label><input type="number" id="teamSalary" min="0" step="100" value="0"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn danger" id="teamDeleteBtn" style="display:none" onclick="deleteTeamMember()">Delete</button>
+      <button class="btn secondary" onclick="closeModal('teamModalOverlay')">Cancel</button>
+      <button class="btn" onclick="saveTeamMember()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- TRANSACTION MODAL -->
+<div class="modal-overlay" id="transactionModalOverlay">
+  <div class="modal">
+    <h3 id="transactionModalTitle">New Transaction</h3>
+    <input type="hidden" id="txnId">
+    <div class="field-row">
+      <div class="field"><label>Type</label>
+        <select id="txnType" onchange="onTxnTypeChange()"><option>Out</option><option>In</option></select>
+      </div>
+      <div class="field"><label>Category</label><select id="txnCategory"></select></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Amount ($)</label><input type="number" id="txnAmount" min="0" step="1"></div>
+      <div class="field"><label>Date</label><input type="date" id="txnDate"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Project (optional)</label><select id="txnProject"><option value="">&mdash;</option></select></div>
+      <div class="field"><label>Team member (optional)</label><select id="txnMember"><option value="">&mdash;</option></select></div>
+    </div>
+    <div class="field"><label>Note</label><input type="text" id="txnNote"></div>
+    <div class="modal-actions">
+      <button class="btn danger" id="txnDeleteBtn" style="display:none" onclick="deleteTransaction()">Delete</button>
+      <button class="btn secondary" onclick="closeModal('transactionModalOverlay')">Cancel</button>
+      <button class="btn" onclick="saveTransaction()">Save</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- PARTNER MODAL -->
+<div class="modal-overlay" id="partnerModalOverlay">
+  <div class="modal">
+    <h3 id="partnerModalTitle">New Partner</h3>
+    <input type="hidden" id="partnerId">
+    <div class="field"><label>Partner name</label><input type="text" id="partnerName"></div>
+    <div class="field">
+      <label>Linked team member (optional)</label>
+      <select id="partnerTeamMember"></select>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Share type</label>
+        <select id="partnerShareType" onchange="onPartnerShareTypeChange()">
+          <option>Percentage</option>
+          <option>Flat Rate</option>
+        </select>
+      </div>
+      <div class="field">
+        <label id="partnerShareValueLabel">Equity share (%)</label>
+        <input type="number" id="partnerShareValue" min="0" step="0.01">
+      </div>
+    </div>
+    <div class="field"><label>Notes</label><textarea id="partnerNotes" rows="2" style="resize:vertical"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn danger" id="partnerDeleteBtn" style="display:none" onclick="deletePartner()">Delete</button>
+      <button class="btn secondary" onclick="closeModal('partnerModalOverlay')">Cancel</button>
+      <button class="btn" onclick="savePartner()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- RUN DIVIDENDS MODAL -->
+<div class="modal-overlay" id="dividendModalOverlay">
+  <div class="modal" style="max-width:520px">
+    <h3>Run Dividends</h3>
+    <div class="field-row">
+      <div class="field">
+        <label>Period</label>
+        <input type="month" id="dividendPeriod" oninput="updateDividendPreview()">
+      </div>
+    </div>
+    <div class="field-row" id="dividendPoolRow">
+      <div class="field" style="grid-column:1/-1">
+        <label>Pool to distribute among % partners (₱)</label>
+        <input type="number" id="dividendPool" min="0" step="1" oninput="updateDividendPreview()" placeholder="e.g. 100000">
+      </div>
+    </div>
+    <div id="dividendPreview" style="margin:12px 0"></div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('dividendModalOverlay')">Cancel</button>
+      <button class="btn" onclick="runDividends()">Confirm &amp; Run</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

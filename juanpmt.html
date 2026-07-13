@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>JuanPMT</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f6f7fb;
+    --panel: #ffffff;
+    --border: #e3e6ee;
+    --text: #1f2430;
+    --text-muted: #6b7280;
+    --accent: #4f46e5;
+    --accent-light: #eef2ff;
+    --green: #16a34a;
+    --green-bg: #ecfdf5;
+    --amber: #d97706;
+    --amber-bg: #fffbeb;
+    --red: #dc2626;
+    --red-bg: #fef2f2;
+    --blue: #2563eb;
+    --blue-bg: #eff6ff;
+    --gray: #6b7280;
+    --gray-bg: #f3f4f6;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+  }
+  #app { max-width: 1280px; margin: 0 auto; padding: 20px 24px 60px; }
+  header.top {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 18px; flex-wrap: wrap; gap: 12px;
+  }
+  header.top h1 { font-size: 20px; margin: 0; font-weight: 700; }
+  header.top .sub { color: var(--text-muted); font-size: 12.5px; margin-top: 2px; }
+  nav.tabs {
+    display: flex; gap: 4px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 4px; flex-wrap: wrap;
+  }
+  nav.tabs button {
+    border: none; background: transparent; padding: 8px 14px; border-radius: 7px;
+    font-size: 13.5px; font-weight: 600; color: var(--text-muted); cursor: pointer;
+  }
+  nav.tabs button.active { background: var(--accent); color: #fff; }
+  nav.tabs button:hover:not(.active) { background: var(--gray-bg); }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 18px; }
+  .kpi { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
+  .kpi .label { color: var(--text-muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+  .kpi .value { font-size: 26px; font-weight: 700; margin-top: 4px; }
+  .kpi .note { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 16px; }
+  .card h2 { font-size: 15px; margin: 0 0 12px; }
+  .card-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 800px) { .card-row { grid-template-columns: 1fr; } }
+  .chart-wrap { position: relative; height: 240px; }
+
+  .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; justify-content: space-between; }
+  .toolbar .filters { display: flex; gap: 8px; flex-wrap: wrap; }
+  select, input[type=text], input[type=date], input[type=number], textarea {
+    border: 1px solid var(--border); border-radius: 7px; padding: 7px 10px; font-size: 13px;
+    background: #fff; color: var(--text); font-family: inherit;
+  }
+  .btn {
+    border: none; border-radius: 7px; padding: 8px 14px; font-size: 13px; font-weight: 600;
+    cursor: pointer; background: var(--accent); color: #fff;
+  }
+  .btn:hover { opacity: .92; }
+  .btn.secondary { background: var(--gray-bg); color: var(--text); }
+  .btn.danger { background: var(--red-bg); color: var(--red); }
+  .btn.small { padding: 4px 9px; font-size: 12px; }
+
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: middle; }
+  th { color: var(--text-muted); font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: .03em; }
+  tr:hover td { background: #fafbff; }
+  td.actions { white-space: nowrap; text-align: right; }
+  td.actions button { margin-left: 6px; }
+
+  .badge { display: inline-block; padding: 3px 9px; border-radius: 100px; font-size: 11.5px; font-weight: 700; }
+  .badge.status-active, .badge.status-inprogress { background: var(--blue-bg); color: var(--blue); }
+  .badge.status-onhold, .badge.status-review { background: var(--amber-bg); color: var(--amber); }
+  .badge.status-completed, .badge.status-done { background: var(--green-bg); color: var(--green); }
+  .badge.status-atrisk { background: var(--red-bg); color: var(--red); }
+  .badge.status-todo { background: var(--gray-bg); color: var(--gray); }
+  .badge.priority-low { background: var(--gray-bg); color: var(--gray); }
+  .badge.priority-medium { background: var(--blue-bg); color: var(--blue); }
+  .badge.priority-high { background: var(--amber-bg); color: var(--amber); }
+  .badge.priority-urgent { background: var(--red-bg); color: var(--red); }
+
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); }
+
+  /* modal */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(20,20,30,.45); display: none;
+    align-items: flex-start; justify-content: center; padding: 40px 16px; z-index: 100; overflow-y: auto;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal { background: #fff; border-radius: 12px; width: 100%; max-width: 480px; padding: 20px; }
+  .modal h3 { margin: 0 0 14px; font-size: 16px; }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 12.5px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; }
+  .field input, .field select, .field textarea { width: 100%; }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
+  /* timeline */
+  .timeline-wrap { overflow-x: auto; padding-bottom: 6px; }
+  .timeline-header { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 6px; min-width: 900px; }
+  .timeline-header .label-col { width: 180px; flex-shrink: 0; }
+  .timeline-header .months { display: flex; flex: 1; }
+  .timeline-header .month { flex: 1; font-size: 11px; color: var(--text-muted); font-weight: 600; text-align: center; padding: 4px 0; border-left: 1px solid var(--border); }
+  .timeline-row { display: flex; align-items: center; min-width: 900px; min-height: 40px; border-bottom: 1px solid var(--border); }
+  .timeline-row .label-col { width: 180px; flex-shrink: 0; font-size: 12.5px; font-weight: 600; padding-right: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .timeline-row .track { flex: 1; position: relative; height: 26px; background: repeating-linear-gradient(to right, transparent, transparent calc(100%/12 - 1px), var(--border) calc(100%/12 - 1px), var(--border) calc(100%/12)); border-radius: 4px; }
+  .timeline-bar { position: absolute; top: 3px; height: 20px; border-radius: 5px; font-size: 10.5px; color: #fff; display: flex; align-items: center; padding: 0 6px; overflow: hidden; white-space: nowrap; font-weight: 600; }
+  .timeline-legend { display: flex; gap: 16px; margin-top: 10px; font-size: 12px; color: var(--text-muted); flex-wrap: wrap; }
+  .timeline-legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+  .progress-bar { background: var(--gray-bg); border-radius: 100px; height: 8px; overflow: hidden; width: 100%; }
+  .progress-bar > div { height: 100%; background: var(--accent); }
+
+  footer.hint { text-align: center; color: var(--text-muted); font-size: 11.5px; margin-top: 24px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <div>
+      <h1>JuanPMT</h1>
+      <div class="sub">Project management &mdash; projects, tasks, timeline, team, budget &amp; finance</div>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button data-tab="overview" class="active">Overview</button>
+      <button data-tab="projects">Projects</button>
+      <button data-tab="tasks">Tasks</button>
+      <button data-tab="timeline">Timeline</button>
+      <button data-tab="team">Team</button>
+      <button data-tab="budget">Budget</button>
+      <button data-tab="finance">Finance</button>
+    </nav>
+  </header>
+
+  <!-- OVERVIEW -->
+  <section class="panel active" id="panel-overview">
+    <div class="kpi-grid" id="kpiGrid"></div>
+    <div class="card-row">
+      <div class="card">
+        <h2>Tasks by status</h2>
+        <div class="chart-wrap"><canvas id="chartTaskStatus"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Budget vs. spent by project</h2>
+        <div class="chart-wrap"><canvas id="chartBudget"></canvas></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Upcoming &amp; overdue tasks (next 14 days)</h2>
+      <div id="upcomingTasksTable"></div>
+    </div>
+  </section>
+
+  <!-- PROJECTS -->
+  <section class="panel" id="panel-projects">
+    <div class="toolbar">
+      <div class="filters">
+        <select id="projStatusFilter">
+          <option value="">All statuses</option>
+          <option>Active</option><option>On Hold</option><option>At Risk</option><option>Completed</option>
+        </select>
+      </div>
+      <button class="btn" onclick="openProjectModal()">+ New Project</button>
+    </div>
+    <div class="card"><div id="projectsTable"></div></div>
+  </section>
+
+  <!-- TASKS -->
+  <section class="panel" id="panel-tasks">
+    <div class="toolbar">
+      <div class="filters">
+        <select id="taskProjectFilter"><option value="">All projects</option></select>
+        <select id="taskOwnerFilter"><option value="">All owners</option></select>
+        <select id="taskStatusFilter">
+          <option value="">All statuses</option>
+          <option>To Do</option><option>In Progress</option><option>Review</option><option>Done</option>
+        </select>
+      </div>
+      <button class="btn" onclick="openTaskModal()">+ New Task</button>
+    </div>
+    <div class="card"><div id="tasksTable"></div></div>
+  </section>
+
+  <!-- TIMELINE -->
+  <section class="panel" id="panel-timeline">
+    <div class="card">
+      <h2>Project timeline</h2>
+      <div class="timeline-wrap" id="timelineWrap"></div>
+      <div class="timeline-legend">
+        <span><span class="legend-dot" style="background:var(--blue)"></span>Active</span>
+        <span><span class="legend-dot" style="background:var(--amber)"></span>On Hold</span>
+        <span><span class="legend-dot" style="background:var(--red)"></span>At Risk</span>
+        <span><span class="legend-dot" style="background:var(--green)"></span>Completed</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- TEAM -->
+  <section class="panel" id="panel-team">
+    <div class="toolbar">
+      <div></div>
+      <button class="btn" onclick="openTeamModal()">+ New Team Member</button>
+    </div>
+    <div class="card">
+      <h2>Workload (assigned hours vs. weekly capacity)</h2>
+      <div class="chart-wrap"><canvas id="chartWorkload"></canvas></div>
+    </div>
+    <div class="card"><div id="teamTable"></div></div>
+  </section>
+
+  <!-- BUDGET -->
+  <section class="panel" id="panel-budget">
+    <div class="kpi-grid" id="budgetKpiGrid"></div>
+    <div class="card">
+      <h2>Budget by project</h2>
+      <div id="budgetTable"></div>
+    </div>
+  </section>
+
+  <!-- FINANCE -->
+  <section class="panel" id="panel-finance">
+    <div class="kpi-grid" id="financeKpiGrid"></div>
+    <div class="card-row">
+      <div class="card">
+        <h2>In vs. Out</h2>
+        <div class="chart-wrap"><canvas id="chartInOut"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Expenses by category</h2>
+        <div class="chart-wrap"><canvas id="chartExpenseCategory"></canvas></div>
+      </div>
+    </div>
+    <div class="toolbar">
+      <div class="filters">
+        <select id="txnTypeFilter">
+          <option value="">All types</option>
+          <option>In</option><option>Out</option>
+        </select>
+        <select id="txnCategoryFilter">
+          <option value="">All categories</option>
+        </select>
+        <select id="txnProjectFilter"><option value="">All projects</option></select>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn secondary" onclick="runPayroll()">Run Payroll This Month</button>
+        <button class="btn" onclick="openTransactionModal()">+ New Transaction</button>
+      </div>
+    </div>
+    <div class="card"><div id="financeTable"></div></div>
+  </section>
+
+  <footer class="hint">Data is stored locally in this artifact and persists across reloads.</footer>
+</div>
+
+<!-- PROJECT MODAL -->
+<div class="modal-overlay" id="projectModalOverlay">
+  <div class="modal">
+    <h3 id="projectModalTitle">New Project</h3>
+    <input type="hidden" id="projectId">
+    <div class="field"><label>Project name</label><input type="text" id="projectName"></div>
+    <div class="field"><label>Client</label><input type="text" id="projectClient"></div>
+    <div class="field-row">
+      <div class="field"><label>Start date</label><input type="date" id="projectStart"></div>
+      <div class="field"><label>End date</label><input type="date" id="projectEnd"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Status</label>
+        <select id="projectStatus"><option>Active</option><option>On Hold</option><option>At Risk</option><option>Completed</option></select>
+      </div>
+      <div class="field"><label>Priority</label>
+        <select id="projectPriority"><option>Low</option><option selected>Medium</option><option>High</option><option>Urgent</option></select>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Budget ($)</label><input type="number" id="projectBudget" min="0" step="100"></div>
+      <div class="field"><label>Spent ($)</label><input type="number" id="projectSpent" min="0" step="100"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn danger" id="projectDeleteBtn" style="display:none" onclick="deleteProject()">Delete</button>
+      <button class="btn secondary" onclick="closeModal('projectModalOverlay')">Cancel</button>
+      <button class="btn" onclick="saveProject()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- TASK MODAL -->
+<div class="modal-overlay" id="taskModalOverlay">
+  <div class="modal">
+    <h3 id="taskModalTitle">New Task</h3>
+    <input type="hidden" id="taskId">
+    <div class="field"><label>Task name</label><input type="text" id="taskName"></div>
+    <div class="field"><label>Project</label><select id="taskProject"></select></div>
+    <div class="field-row">
+      <div class="field"><label>Owner</label><select id="taskOwner"></select></div>
+      <div class="field"><label>Due date</label><input type="date" id="taskDue"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Status</label>
+        <select id="taskStatus"><option>To Do</option><option>In Progress</option><option>Review</option><option>Done</option></select>
+      </div>
+      <div class="field"><label>Priority</label>
+        <select id="taskPriority"><option>Low</option><option selected>Medium</option><option>High</option><option>Urgent</option></select>
+      </div>
+    </div>
+    <div class="field"><label>Estimated hours</label><input type="number" id="taskHours" min="0" step="1"></div>
+    <div class="modal-actions">
+      <button class="btn danger" id="taskDeleteBtn" style="display:none" onclick="deleteTask()">Delete</button>
+      <button class="btn secondary" onclick="closeModal('taskModalOverlay')">Cancel</button>
+      <button class="btn" onclick="saveTask()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- TEAM MODAL -->
+<div class="modal-overlay" id="teamModalOverlay">
+  <div class="modal">
+    <h3 id="teamModalTitle">New Team Member</h3>
+    <input type="hidden" id="teamId">
+    <div class="field"><label>Name</label><input type="text" id="teamName"></div>
+    <div class="field"><label>Role</label><input type="text" id="teamRole"></div>
+    <div class="field-row">
+      <div class="field"><label>Weekly capacity (hours)</label><input type="number" id="teamCapacity" min="0" step="1" value="40"></div>
+      <div class="field"><label>Monthly salary ($)</label><input type="number" id="teamSalary" min="0" step="100" value="0"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn danger" id="teamDeleteBtn" style="display:none" onclick="deleteTeamMember()">Delete</button>
+      <button class="btn secondary" onclick="closeModal('teamModalOverlay')">Cancel</button>
+      <button class="btn" onclick="saveTeamMember()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- TRANSACTION MODAL -->
+<div class="modal-overlay" id="transactionModalOverlay">
+  <div class="modal">
+    <h3 id="transactionModalTitle">New Transaction</h3>
+    <input type="hidden" id="txnId">
+    <div class="field-row">
+      <div class="field"><label>Type</label>
+        <select id="txnType" onchange="onTxnTypeChange()"><option>Out</option><option>In</option></select>
+      </div>
+      <div class="field"><label>Category</label><select id="txnCategory"></select></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Amount ($)</label><input type="number" id="txnAmount" min="0" step="1"></div>
+      <div class="field"><label>Date</label><input type="date" id="txnDate"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Project (optional)</label><select id="txnProject"><option value="">&mdash;</option></select></div>
+      <div class="field"><label>Team member (optional)</label><select id="txnMember"><option value="">&mdash;</option></select></div>
+    </div>
+    <div class="field"><label>Note</label><input type="text" id="txnNote"></div>
+    <div class="modal-actions">
+      <button class="btn danger" id="txnDeleteBtn" style="display:none" onclick="deleteTransaction()">Delete</button>
+      <button class="btn secondary" onclick="closeModal('transactionModalOverlay')">Cancel</button>
+      <button class="btn" onclick="saveTransaction()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---------- DATA LAYER ----------
+const STORAGE_KEY = 'juanpmt_data_v2';
+
+function emptyData() {
+  return { team: [], projects: [], tasks: [], transactions: [] };
+}
+
+const OUT_CATEGORIES = ['Salary', 'Software & Tools', 'Marketing', 'Office', 'Contractor', 'Travel', 'Other'];
+const IN_CATEGORIES = ['Client Payment', 'Investment', 'Other Income'];
+
+let data = load();
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      parsed.team = parsed.team || [];
+      parsed.projects = parsed.projects || [];
+      parsed.tasks = parsed.tasks || [];
+      parsed.transactions = parsed.transactions || [];
+      return parsed;
+    }
+  } catch (e) {}
+  const fresh = emptyData();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
+  return fresh;
+}
+function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+function uid(prefix) { return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+
+// ---------- HELPERS ----------
+function fmtMoney(n) { return '$' + Number(n||0).toLocaleString(undefined, {maximumFractionDigits:0}); }
+function fmtDate(s) { if(!s) return '—'; const dt = new Date(s+'T00:00:00'); return dt.toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'}); }
+function daysBetween(a,b){ return Math.round((new Date(b)-new Date(a))/86400000); }
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function slugStatus(s){ return s.toLowerCase().replace(/\s+/g,''); }
+function monthKey(dateStr){ return (dateStr||'').slice(0,7); }
+function monthLabel(key){ const [y,m] = key.split('-'); return new Date(Number(y), Number(m)-1, 1).toLocaleDateString(undefined,{month:'short', year:'numeric'}); }
+function projectName(id){ const p = data.projects.find(x=>x.id===id); return p ? p.name : '—'; }
+function memberName(id){ const m = data.team.find(x=>x.id===id); return m ? m.name : '—'; }
+function statusColor(status){
+  const map = { 'Active':'var(--blue)', 'In Progress':'var(--blue)', 'On Hold':'var(--amber)', 'Review':'var(--amber)',
+    'At Risk':'var(--red)', 'Completed':'var(--green)', 'Done':'var(--green)', 'To Do':'var(--gray)' };
+  return map[status] || 'var(--gray)';
+}
+
+// ---------- TABS ----------
+document.getElementById('tabs').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-tab]');
+  if (!btn) return;
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+  renderAll();
+});
+
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+
+// ---------- RENDER: OVERVIEW ----------
+let charts = {};
+function destroyChart(key){ if(charts[key]){ charts[key].destroy(); delete charts[key]; } }
+
+function renderOverview(){
+  const activeProjects = data.projects.filter(p=>p.status==='Active').length;
+  const overdue = data.tasks.filter(t=>t.status!=='Done' && t.due < todayStr()).length;
+  const dueSoon = data.tasks.filter(t=>t.status!=='Done' && t.due >= todayStr() && daysBetween(todayStr(), t.due) <= 7).length;
+  const totalBudget = data.projects.reduce((s,p)=>s+Number(p.budget||0),0);
+  const totalSpent = data.projects.reduce((s,p)=>s+Number(p.spent||0),0);
+  const util = totalBudget ? Math.round(totalSpent/totalBudget*100) : 0;
+
+  document.getElementById('kpiGrid').innerHTML = `
+    <div class="kpi"><div class="label">Active Projects</div><div class="value">${activeProjects}</div><div class="note">${data.projects.length} total</div></div>
+    <div class="kpi"><div class="label">Overdue Tasks</div><div class="value" style="color:${overdue?'var(--red)':'inherit'}">${overdue}</div><div class="note">needs attention</div></div>
+    <div class="kpi"><div class="label">Due in 7 Days</div><div class="value">${dueSoon}</div><div class="note">upcoming</div></div>
+    <div class="kpi"><div class="label">Budget Utilization</div><div class="value">${util}%</div><div class="note">${fmtMoney(totalSpent)} / ${fmtMoney(totalBudget)}</div></div>
+  `;
+
+  const statuses = ['To Do','In Progress','Review','Done'];
+  const counts = statuses.map(s => data.tasks.filter(t=>t.status===s).length);
+  destroyChart('taskStatus');
+  charts.taskStatus = new Chart(document.getElementById('chartTaskStatus'), {
+    type: 'doughnut',
+    data: { labels: statuses, datasets: [{ data: counts, backgroundColor: ['#9ca3af','#2563eb','#d97706','#16a34a'] }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } }
+  });
+
+  destroyChart('budget');
+  charts.budget = new Chart(document.getElementById('chartBudget'), {
+    type: 'bar',
+    data: {
+      labels: data.projects.map(p=>p.name),
+      datasets: [
+        { label: 'Budget', data: data.projects.map(p=>p.budget), backgroundColor: '#c7d2fe' },
+        { label: 'Spent', data: data.projects.map(p=>p.spent), backgroundColor: '#4f46e5' }
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } }, scales: { x: { ticks: { font: { size: 10 } } }, y: { beginAtZero: true } } }
+  });
+
+  const upcoming = data.tasks
+    .filter(t => t.status !== 'Done' && daysBetween(todayStr(), t.due) <= 14)
+    .sort((a,b) => a.due.localeCompare(b.due));
+  const rows = upcoming.map(t => {
+    const overdueRow = t.due < todayStr();
+    return `<tr>
+      <td>${t.name}</td>
+      <td>${projectName(t.project)}</td>
+      <td>${memberName(t.owner)}</td>
+      <td style="color:${overdueRow?'var(--red)':'inherit'};font-weight:${overdueRow?700:400}">${fmtDate(t.due)}${overdueRow?' (overdue)':''}</td>
+      <td><span class="badge status-${slugStatus(t.status)}">${t.status}</span></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('upcomingTasksTable').innerHTML = upcoming.length ? `
+    <table><thead><tr><th>Task</th><th>Project</th><th>Owner</th><th>Due</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>
+  ` : `<div class="empty-state">Nothing due in the next 14 days.</div>`;
+}
+
+// ---------- RENDER: PROJECTS ----------
+function renderProjects(){
+  const filter = document.getElementById('projStatusFilter').value;
+  const rows = data.projects.filter(p => !filter || p.status===filter).map(p => {
+    const pct = p.budget ? Math.min(100, Math.round(p.spent/p.budget*100)) : 0;
+    return `<tr>
+      <td><strong>${p.name}</strong><div style="color:var(--text-muted);font-size:11.5px">${p.client||''}</div></td>
+      <td><span class="badge status-${slugStatus(p.status)}">${p.status}</span></td>
+      <td><span class="badge priority-${slugStatus(p.priority)}">${p.priority}</span></td>
+      <td>${fmtDate(p.start)} &rarr; ${fmtDate(p.end)}</td>
+      <td style="min-width:120px">
+        <div class="progress-bar"><div style="width:${pct}%; background:${pct>=100?'var(--red)':'var(--accent)'}"></div></div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${fmtMoney(p.spent)} / ${fmtMoney(p.budget)} (${pct}%)</div>
+      </td>
+      <td class="actions">
+        <button class="btn small secondary" onclick="openProjectModal('${p.id}')">Edit</button>
+      </td>
+    </tr>`;
+  }).join('');
+  document.getElementById('projectsTable').innerHTML = data.projects.length ? `
+    <table><thead><tr><th>Project</th><th>Status</th><th>Priority</th><th>Timeline</th><th>Budget</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">No projects match this filter.</td></tr>'}</tbody></table>
+  ` : `<div class="empty-state">No projects yet. Click "+ New Project" to add one.</div>`;
+}
+
+// ---------- RENDER: TASKS ----------
+function populateTaskFilterOptions(){
+  const projSel = document.getElementById('taskProjectFilter');
+  const ownerSel = document.getElementById('taskOwnerFilter');
+  const curProj = projSel.value, curOwner = ownerSel.value;
+  projSel.innerHTML = '<option value="">All projects</option>' + data.projects.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+  ownerSel.innerHTML = '<option value="">All owners</option>' + data.team.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
+  projSel.value = curProj; ownerSel.value = curOwner;
+}
+function renderTasks(){
+  populateTaskFilterOptions();
+  const pf = document.getElementById('taskProjectFilter').value;
+  const of = document.getElementById('taskOwnerFilter').value;
+  const sf = document.getElementById('taskStatusFilter').value;
+  const list = data.tasks.filter(t => (!pf||t.project===pf) && (!of||t.owner===of) && (!sf||t.status===sf))
+    .sort((a,b)=>a.due.localeCompare(b.due));
+  const rows = list.map(t => {
+    const overdueRow = t.status!=='Done' && t.due < todayStr();
+    return `<tr>
+      <td>${t.name}</td>
+      <td>${projectName(t.project)}</td>
+      <td>${memberName(t.owner)}</td>
+      <td style="color:${overdueRow?'var(--red)':'inherit'};font-weight:${overdueRow?700:400}">${fmtDate(t.due)}</td>
+      <td><span class="badge status-${slugStatus(t.status)}">${t.status}</span></td>
+      <td><span class="badge priority-${slugStatus(t.priority)}">${t.priority}</span></td>
+      <td>${t.hours||0}h</td>
+      <td class="actions"><button class="btn small secondary" onclick="openTaskModal('${t.id}')">Edit</button></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('tasksTable').innerHTML = data.tasks.length ? `
+    <table><thead><tr><th>Task</th><th>Project</th><th>Owner</th><th>Due</th><th>Status</th><th>Priority</th><th>Est.</th><th></th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="8" style="text-align:center;color:var(--text-muted)">No tasks match this filter.</td></tr>'}</tbody></table>
+  ` : `<div class="empty-state">No tasks yet. Click "+ New Task" to add one.</div>`;
+}
+
+// ---------- RENDER: TIMELINE ----------
+function renderTimeline(){
+  const wrap = document.getElementById('timelineWrap');
+  if (!data.projects.length) { wrap.innerHTML = '<div class="empty-state">No projects to show.</div>'; return; }
+  const starts = data.projects.map(p=>new Date(p.start));
+  const ends = data.projects.map(p=>new Date(p.end));
+  let rangeStart = new Date(Math.min(...starts));
+  let rangeEnd = new Date(Math.max(...ends));
+  rangeStart.setDate(1);
+  rangeEnd = new Date(rangeEnd.getFullYear(), rangeEnd.getMonth()+1, 0);
+  const totalDays = Math.max(1, daysBetween(rangeStart, rangeEnd));
+
+  const months = [];
+  let cur = new Date(rangeStart);
+  while (cur <= rangeEnd) {
+    months.push(cur.toLocaleDateString(undefined,{month:'short', year: cur.getMonth()===0? 'numeric': undefined}));
+    cur.setMonth(cur.getMonth()+1);
+  }
+
+  let html = `<div class="timeline-header"><div class="label-col"></div><div class="months">${months.map(m=>`<div class="month">${m}</div>`).join('')}</div></div>`;
+  data.projects.forEach(p => {
+    const offsetPct = daysBetween(rangeStart, p.start) / totalDays * 100;
+    const widthPct = Math.max(1.5, daysBetween(p.start, p.end) / totalDays * 100);
+    const taskDots = data.tasks.filter(t=>t.project===p.id).map(t => {
+      const dotPct = daysBetween(rangeStart, t.due) / totalDays * 100;
+      const done = t.status === 'Done';
+      return `<div title="${t.name} (${fmtDate(t.due)})" style="position:absolute; left:${dotPct}%; top:-4px; width:8px; height:8px; border-radius:50%; background:${done?'var(--green)':'var(--text)'}; border:2px solid #fff; transform:translateX(-50%);"></div>`;
+    }).join('');
+    html += `<div class="timeline-row">
+      <div class="label-col">${p.name}</div>
+      <div class="track">
+        <div class="timeline-bar" style="left:${offsetPct}%; width:${widthPct}%; background:${statusColor(p.status)}">${p.name}</div>
+        ${taskDots}
+      </div>
+    </div>`;
+  });
+  wrap.innerHTML = html;
+}
+
+// ---------- RENDER: TEAM ----------
+function taskLoadFor(memberId){
+  return data.tasks.filter(t=>t.owner===memberId && t.status!=='Done').reduce((s,t)=>s+Number(t.hours||0),0);
+}
+function renderTeam(){
+  destroyChart('workload');
+  charts.workload = new Chart(document.getElementById('chartWorkload'), {
+    type: 'bar',
+    data: {
+      labels: data.team.map(m=>m.name),
+      datasets: [
+        { label: 'Assigned (open tasks, hrs)', data: data.team.map(m=>taskLoadFor(m.id)), backgroundColor: '#4f46e5' },
+        { label: 'Weekly capacity (hrs)', data: data.team.map(m=>m.capacity), backgroundColor: '#e5e7eb' }
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } }, scales: { y: { beginAtZero: true } } }
+  });
+
+  const rows = data.team.map(m => {
+    const load = taskLoadFor(m.id);
+    const pct = m.capacity ? Math.round(load/m.capacity*100) : 0;
+    const openTasks = data.tasks.filter(t=>t.owner===m.id && t.status!=='Done').length;
+    return `<tr>
+      <td><strong>${m.name}</strong></td>
+      <td>${m.role||'—'}</td>
+      <td>${openTasks}</td>
+      <td style="min-width:140px">
+        <div class="progress-bar"><div style="width:${Math.min(100,pct)}%; background:${pct>100?'var(--red)':'var(--accent)'}"></div></div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${load}h / ${m.capacity}h (${pct}%)</div>
+      </td>
+      <td>${m.salary ? fmtMoney(m.salary) + '/mo' : '—'}</td>
+      <td class="actions"><button class="btn small secondary" onclick="openTeamModal('${m.id}')">Edit</button></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('teamTable').innerHTML = data.team.length ? `
+    <table><thead><tr><th>Name</th><th>Role</th><th>Open Tasks</th><th>Workload</th><th>Salary</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+  ` : `<div class="empty-state">No team members yet.</div>`;
+}
+
+// ---------- RENDER: BUDGET ----------
+function renderBudget(){
+  const totalBudget = data.projects.reduce((s,p)=>s+Number(p.budget||0),0);
+  const totalSpent = data.projects.reduce((s,p)=>s+Number(p.spent||0),0);
+  const remaining = totalBudget - totalSpent;
+  const overBudget = data.projects.filter(p=>p.spent > p.budget).length;
+  document.getElementById('budgetKpiGrid').innerHTML = `
+    <div class="kpi"><div class="label">Total Budget</div><div class="value">${fmtMoney(totalBudget)}</div></div>
+    <div class="kpi"><div class="label">Total Spent</div><div class="value">${fmtMoney(totalSpent)}</div></div>
+    <div class="kpi"><div class="label">Remaining</div><div class="value" style="color:${remaining<0?'var(--red)':'inherit'}">${fmtMoney(remaining)}</div></div>
+    <div class="kpi"><div class="label">Over Budget</div><div class="value" style="color:${overBudget?'var(--red)':'inherit'}">${overBudget}</div><div class="note">project(s)</div></div>
+  `;
+  const rows = data.projects.map(p => {
+    const pct = p.budget ? Math.round(p.spent/p.budget*100) : 0;
+    const over = p.spent > p.budget;
+    return `<tr>
+      <td><strong>${p.name}</strong></td>
+      <td>${fmtMoney(p.budget)}</td>
+      <td>${fmtMoney(p.spent)}</td>
+      <td style="color:${over?'var(--red)':'inherit'}">${fmtMoney(p.budget-p.spent)}</td>
+      <td style="min-width:120px">
+        <div class="progress-bar"><div style="width:${Math.min(100,pct)}%; background:${over?'var(--red)':'var(--accent)'}"></div></div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${pct}%</div>
+      </td>
+    </tr>`;
+  }).join('');
+  document.getElementById('budgetTable').innerHTML = data.projects.length ? `
+    <table><thead><tr><th>Project</th><th>Budget</th><th>Spent</th><th>Remaining</th><th>Utilization</th></tr></thead><tbody>${rows}</tbody></table>
+  ` : `<div class="empty-state">No projects yet.</div>`;
+}
+
+// ---------- RENDER: FINANCE ----------
+function populateFinanceFilterOptions(){
+  const catSel = document.getElementById('txnCategoryFilter');
+  const projSel = document.getElementById('txnProjectFilter');
+  const curCat = catSel.value, curProj = projSel.value;
+  const allCats = [...OUT_CATEGORIES, ...IN_CATEGORIES];
+  catSel.innerHTML = '<option value="">All categories</option>' + allCats.map(c=>`<option>${c}</option>`).join('');
+  projSel.innerHTML = '<option value="">All projects</option>' + data.projects.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+  catSel.value = curCat; projSel.value = curProj;
+}
+function renderFinance(){
+  populateFinanceFilterOptions();
+  const totalIn = data.transactions.filter(t=>t.type==='In').reduce((s,t)=>s+Number(t.amount||0),0);
+  const totalOut = data.transactions.filter(t=>t.type==='Out').reduce((s,t)=>s+Number(t.amount||0),0);
+  const net = totalIn - totalOut;
+  const monthlyPayroll = data.team.reduce((s,m)=>s+Number(m.salary||0),0);
+
+  document.getElementById('financeKpiGrid').innerHTML = `
+    <div class="kpi"><div class="label">Total In</div><div class="value" style="color:var(--green)">${fmtMoney(totalIn)}</div></div>
+    <div class="kpi"><div class="label">Total Out</div><div class="value" style="color:var(--red)">${fmtMoney(totalOut)}</div></div>
+    <div class="kpi"><div class="label">Net</div><div class="value" style="color:${net<0?'var(--red)':'var(--green)'}">${fmtMoney(net)}</div></div>
+    <div class="kpi"><div class="label">Monthly Payroll</div><div class="value">${fmtMoney(monthlyPayroll)}</div><div class="note">${data.team.filter(m=>Number(m.salary||0)>0).length} salaried</div></div>
+  `;
+
+  const months = [...new Set(data.transactions.map(t=>monthKey(t.date)))].sort();
+  const inByMonth = months.map(mk => data.transactions.filter(t=>t.type==='In' && monthKey(t.date)===mk).reduce((s,t)=>s+Number(t.amount||0),0));
+  const outByMonth = months.map(mk => data.transactions.filter(t=>t.type==='Out' && monthKey(t.date)===mk).reduce((s,t)=>s+Number(t.amount||0),0));
+  destroyChart('inOut');
+  charts.inOut = new Chart(document.getElementById('chartInOut'), {
+    type: 'bar',
+    data: {
+      labels: months.map(monthLabel),
+      datasets: [
+        { label: 'In', data: inByMonth, backgroundColor: '#16a34a' },
+        { label: 'Out', data: outByMonth, backgroundColor: '#dc2626' }
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } }, scales: { y: { beginAtZero: true } } }
+  });
+
+  const expenseCats = OUT_CATEGORIES.filter(c => data.transactions.some(t=>t.type==='Out' && t.category===c));
+  const expenseTotals = expenseCats.map(c => data.transactions.filter(t=>t.type==='Out' && t.category===c).reduce((s,t)=>s+Number(t.amount||0),0));
+  destroyChart('expenseCategory');
+  charts.expenseCategory = new Chart(document.getElementById('chartExpenseCategory'), {
+    type: 'doughnut',
+    data: { labels: expenseCats, datasets: [{ data: expenseTotals, backgroundColor: ['#dc2626','#d97706','#4f46e5','#2563eb','#9333ea','#0891b2','#6b7280'] }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } }
+  });
+
+  const tf = document.getElementById('txnTypeFilter').value;
+  const cf = document.getElementById('txnCategoryFilter').value;
+  const pf = document.getElementById('txnProjectFilter').value;
+  const list = data.transactions.filter(t => (!tf||t.type===tf) && (!cf||t.category===cf) && (!pf||t.project===pf))
+    .sort((a,b)=>b.date.localeCompare(a.date));
+  const rows = list.map(t => `<tr>
+      <td>${fmtDate(t.date)}</td>
+      <td><span class="badge" style="background:${t.type==='In'?'var(--green-bg)':'var(--red-bg)'};color:${t.type==='In'?'var(--green)':'var(--red)'}">${t.type}</span></td>
+      <td>${t.category}</td>
+      <td style="color:${t.type==='In'?'var(--green)':'var(--red)'};font-weight:700">${t.type==='In'?'+':'-'}${fmtMoney(t.amount)}</td>
+      <td>${t.project ? projectName(t.project) : '—'}</td>
+      <td>${t.member ? memberName(t.member) : '—'}</td>
+      <td style="color:var(--text-muted)">${t.note||''}</td>
+      <td class="actions"><button class="btn small secondary" onclick="openTransactionModal('${t.id}')">Edit</button></td>
+    </tr>`).join('');
+  document.getElementById('financeTable').innerHTML = data.transactions.length ? `
+    <table><thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Amount</th><th>Project</th><th>Member</th><th>Note</th><th></th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="8" style="text-align:center;color:var(--text-muted)">No transactions match this filter.</td></tr>'}</tbody></table>
+  ` : `<div class="empty-state">No transactions yet. Click "+ New Transaction" to log income or an expense.</div>`;
+}
+
+function runPayroll(){
+  const salaried = data.team.filter(m => Number(m.salary||0) > 0);
+  if (!salaried.length) { alert('No team members have a monthly salary set. Add one via Team > Edit.'); return; }
+  const mk = monthKey(todayStr());
+  let created = 0;
+  salaried.forEach(m => {
+    const already = data.transactions.some(t => t.category==='Salary' && t.member===m.id && monthKey(t.date)===mk);
+    if (already) return;
+    data.transactions.push({
+      id: uid('f'),
+      type: 'Out',
+      category: 'Salary',
+      amount: Number(m.salary),
+      date: todayStr(),
+      project: '',
+      member: m.id,
+      note: `Payroll — ${monthLabel(mk)}`
+    });
+    created++;
+  });
+  save();
+  renderAll();
+  alert(created ? `Logged payroll for ${created} team member(s).` : 'Payroll for this month was already logged for everyone.');
+}
+
+// ---------- MODALS: PROJECT ----------
+function openProjectModal(id){
+  const overlay = document.getElementById('projectModalOverlay');
+  const p = id ? data.projects.find(x=>x.id===id) : null;
+  document.getElementById('projectModalTitle').textContent = p ? 'Edit Project' : 'New Project';
+  document.getElementById('projectId').value = id || '';
+  document.getElementById('projectName').value = p ? p.name : '';
+  document.getElementById('projectClient').value = p ? p.client : '';
+  document.getElementById('projectStart').value = p ? p.start : todayStr();
+  document.getElementById('projectEnd').value = p ? p.end : todayStr();
+  document.getElementById('projectStatus').value = p ? p.status : 'Active';
+  document.getElementById('projectPriority').value = p ? p.priority : 'Medium';
+  document.getElementById('projectBudget').value = p ? p.budget : 0;
+  document.getElementById('projectSpent').value = p ? p.spent : 0;
+  document.getElementById('projectDeleteBtn').style.display = p ? 'inline-block' : 'none';
+  overlay.classList.add('open');
+}
+function saveProject(){
+  const id = document.getElementById('projectId').value;
+  const name = document.getElementById('projectName').value.trim();
+  if (!name) { alert('Project name is required.'); return; }
+  const obj = {
+    id: id || uid('p'),
+    name,
+    client: document.getElementById('projectClient').value.trim(),
+    start: document.getElementById('projectStart').value || todayStr(),
+    end: document.getElementById('projectEnd').value || todayStr(),
+    status: document.getElementById('projectStatus').value,
+    priority: document.getElementById('projectPriority').value,
+    budget: Number(document.getElementById('projectBudget').value) || 0,
+    spent: Number(document.getElementById('projectSpent').value) || 0
+  };
+  if (id) {
+    const idx = data.projects.findIndex(x=>x.id===id);
+    data.projects[idx] = obj;
+  } else {
+    data.projects.push(obj);
+  }
+  save();
+  closeModal('projectModalOverlay');
+  renderAll();
+}
+function deleteProject(){
+  const id = document.getElementById('projectId').value;
+  if (!id) return;
+  if (!confirm('Delete this project and its tasks?')) return;
+  data.projects = data.projects.filter(x=>x.id!==id);
+  data.tasks = data.tasks.filter(x=>x.project!==id);
+  save();
+  closeModal('projectModalOverlay');
+  renderAll();
+}
+
+// ---------- MODALS: TASK ----------
+function populateTaskModalSelects(){
+  document.getElementById('taskProject').innerHTML = data.projects.map(p=>`<option value="${p.id}">${p.name}</option>`).join('') || '<option value="">No projects — add one first</option>';
+  document.getElementById('taskOwner').innerHTML = data.team.map(m=>`<option value="${m.id}">${m.name}</option>`).join('') || '<option value="">No team members — add one first</option>';
+}
+function openTaskModal(id){
+  populateTaskModalSelects();
+  const overlay = document.getElementById('taskModalOverlay');
+  const t = id ? data.tasks.find(x=>x.id===id) : null;
+  document.getElementById('taskModalTitle').textContent = t ? 'Edit Task' : 'New Task';
+  document.getElementById('taskId').value = id || '';
+  document.getElementById('taskName').value = t ? t.name : '';
+  document.getElementById('taskProject').value = t ? t.project : (data.projects[0]?.id || '');
+  document.getElementById('taskOwner').value = t ? t.owner : (data.team[0]?.id || '');
+  document.getElementById('taskDue').value = t ? t.due : todayStr();
+  document.getElementById('taskStatus').value = t ? t.status : 'To Do';
+  document.getElementById('taskPriority').value = t ? t.priority : 'Medium';
+  document.getElementById('taskHours').value = t ? t.hours : 4;
+  document.getElementById('taskDeleteBtn').style.display = t ? 'inline-block' : 'none';
+  overlay.classList.add('open');
+}
+function saveTask(){
+  const id = document.getElementById('taskId').value;
+  const name = document.getElementById('taskName').value.trim();
+  if (!name) { alert('Task name is required.'); return; }
+  if (!data.projects.length) { alert('Create a project first.'); return; }
+  if (!data.team.length) { alert('Add a team member first.'); return; }
+  const obj = {
+    id: id || uid('k'),
+    name,
+    project: document.getElementById('taskProject').value,
+    owner: document.getElementById('taskOwner').value,
+    due: document.getElementById('taskDue').value || todayStr(),
+    status: document.getElementById('taskStatus').value,
+    priority: document.getElementById('taskPriority').value,
+    hours: Number(document.getElementById('taskHours').value) || 0
+  };
+  if (id) {
+    const idx = data.tasks.findIndex(x=>x.id===id);
+    data.tasks[idx] = obj;
+  } else {
+    data.tasks.push(obj);
+  }
+  save();
+  closeModal('taskModalOverlay');
+  renderAll();
+}
+function deleteTask(){
+  const id = document.getElementById('taskId').value;
+  if (!id) return;
+  if (!confirm('Delete this task?')) return;
+  data.tasks = data.tasks.filter(x=>x.id!==id);
+  save();
+  closeModal('taskModalOverlay');
+  renderAll();
+}
+
+// ---------- MODALS: TEAM ----------
+function openTeamModal(id){
+  const overlay = document.getElementById('teamModalOverlay');
+  const m = id ? data.team.find(x=>x.id===id) : null;
+  document.getElementById('teamModalTitle').textContent = m ? 'Edit Team Member' : 'New Team Member';
+  document.getElementById('teamId').value = id || '';
+  document.getElementById('teamName').value = m ? m.name : '';
+  document.getElementById('teamRole').value = m ? m.role : '';
+  document.getElementById('teamCapacity').value = m ? m.capacity : 40;
+  document.getElementById('teamSalary').value = m ? (m.salary || 0) : 0;
+  document.getElementById('teamDeleteBtn').style.display = m ? 'inline-block' : 'none';
+  overlay.classList.add('open');
+}
+function saveTeamMember(){
+  const id = document.getElementById('teamId').value;
+  const name = document.getElementById('teamName').value.trim();
+  if (!name) { alert('Name is required.'); return; }
+  const obj = {
+    id: id || uid('t'),
+    name,
+    role: document.getElementById('teamRole').value.trim(),
+    capacity: Number(document.getElementById('teamCapacity').value) || 40,
+    salary: Number(document.getElementById('teamSalary').value) || 0
+  };
+  if (id) {
+    const idx = data.team.findIndex(x=>x.id===id);
+    data.team[idx] = obj;
+  } else {
+    data.team.push(obj);
+  }
+  save();
+  closeModal('teamModalOverlay');
+  renderAll();
+}
+function deleteTeamMember(){
+  const id = document.getElementById('teamId').value;
+  if (!id) return;
+  if (!confirm('Delete this team member? Their tasks will be unassigned.')) return;
+  data.team = data.team.filter(x=>x.id!==id);
+  save();
+  closeModal('teamModalOverlay');
+  renderAll();
+}
+
+// ---------- MODALS: TRANSACTION ----------
+function onTxnTypeChange(){
+  const type = document.getElementById('txnType').value;
+  const cats = type === 'In' ? IN_CATEGORIES : OUT_CATEGORIES;
+  document.getElementById('txnCategory').innerHTML = cats.map(c=>`<option>${c}</option>`).join('');
+}
+function populateTransactionModalSelects(){
+  onTxnTypeChange();
+  document.getElementById('txnProject').innerHTML = '<option value="">&mdash;</option>' + data.projects.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+  document.getElementById('txnMember').innerHTML = '<option value="">&mdash;</option>' + data.team.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
+}
+function openTransactionModal(id){
+  const overlay = document.getElementById('transactionModalOverlay');
+  const t = id ? data.transactions.find(x=>x.id===id) : null;
+  document.getElementById('transactionModalTitle').textContent = t ? 'Edit Transaction' : 'New Transaction';
+  document.getElementById('txnId').value = id || '';
+  document.getElementById('txnType').value = t ? t.type : 'Out';
+  populateTransactionModalSelects();
+  document.getElementById('txnCategory').value = t ? t.category : (document.getElementById('txnType').value==='In' ? IN_CATEGORIES[0] : OUT_CATEGORIES[0]);
+  document.getElementById('txnAmount').value = t ? t.amount : '';
+  document.getElementById('txnDate').value = t ? t.date : todayStr();
+  document.getElementById('txnProject').value = t ? (t.project||'') : '';
+  document.getElementById('txnMember').value = t ? (t.member||'') : '';
+  document.getElementById('txnNote').value = t ? (t.note||'') : '';
+  document.getElementById('txnDeleteBtn').style.display = t ? 'inline-block' : 'none';
+  overlay.classList.add('open');
+}
+function saveTransaction(){
+  const id = document.getElementById('txnId').value;
+  const amount = Number(document.getElementById('txnAmount').value);
+  if (!amount || amount <= 0) { alert('Enter an amount greater than 0.'); return; }
+  const obj = {
+    id: id || uid('f'),
+    type: document.getElementById('txnType').value,
+    category: document.getElementById('txnCategory').value,
+    amount,
+    date: document.getElementById('txnDate').value || todayStr(),
+    project: document.getElementById('txnProject').value,
+    member: document.getElementById('txnMember').value,
+    note: document.getElementById('txnNote').value.trim()
+  };
+  if (id) {
+    const idx = data.transactions.findIndex(x=>x.id===id);
+    data.transactions[idx] = obj;
+  } else {
+    data.transactions.push(obj);
+  }
+  save();
+  closeModal('transactionModalOverlay');
+  renderAll();
+}
+function deleteTransaction(){
+  const id = document.getElementById('txnId').value;
+  if (!id) return;
+  if (!confirm('Delete this transaction?')) return;
+  data.transactions = data.transactions.filter(x=>x.id!==id);
+  save();
+  closeModal('transactionModalOverlay');
+  renderAll();
+}
+
+// ---------- FILTER LISTENERS ----------
+document.getElementById('projStatusFilter').addEventListener('change', renderProjects);
+document.getElementById('taskProjectFilter').addEventListener('change', renderTasks);
+document.getElementById('taskOwnerFilter').addEventListener('change', renderTasks);
+document.getElementById('taskStatusFilter').addEventListener('change', renderTasks);
+document.getElementById('txnTypeFilter').addEventListener('change', renderFinance);
+document.getElementById('txnCategoryFilter').addEventListener('change', renderFinance);
+document.getElementById('txnProjectFilter').addEventListener('change', renderFinance);
+
+// close modal on overlay click
+document.querySelectorAll('.modal-overlay').forEach(ov => {
+  ov.addEventListener('click', (e) => { if (e.target === ov) ov.classList.remove('open'); });
+});
+
+// ---------- MASTER RENDER ----------
+function renderAll(){
+  renderOverview();
+  renderProjects();
+  renderTasks();
+  renderTimeline();
+  renderTeam();
+  renderBudget();
+  renderFinance();
+}
+renderAll();
+</script>
+</body>
+</html>
