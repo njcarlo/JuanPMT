@@ -1,4 +1,4 @@
-import { data, save, uid, OUT_CATEGORIES, IN_CATEGORIES } from '../data.js';
+import { data, save, uid, getOutCategories, getInCategories } from '../data.js';
 import { fmtMoney, fmtDate, todayStr, monthKey, monthLabel, projectName, memberName } from '../helpers.js';
 import { charts, destroyChart } from '../charts.js';
 
@@ -9,14 +9,29 @@ function populateFilterOptions() {
   const catSel  = document.getElementById('txnCategoryFilter');
   const projSel = document.getElementById('txnProjectFilter');
   const curCat = catSel.value, curProj = projSel.value;
-  catSel.innerHTML  = '<option value="">All categories</option>' + [...OUT_CATEGORIES, ...IN_CATEGORIES].map(c => `<option>${c}</option>`).join('');
+  const known = [...getOutCategories(), ...getInCategories()];
+  const fromTxns = [...new Set(data.transactions.map(t => t.category).filter(Boolean))];
+  const allCats = [...known, ...fromTxns.filter(c => !known.includes(c))];
+  catSel.innerHTML  = '<option value="">All categories</option>' + allCats.map(c => `<option>${c}</option>`).join('');
   projSel.innerHTML = '<option value="">All projects</option>' + data.projects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
   catSel.value = curCat; projSel.value = curProj;
 }
 
 export function onTxnTypeChange() {
   const type = document.getElementById('txnType').value;
-  document.getElementById('txnCategory').innerHTML = (type === 'In' ? IN_CATEGORIES : OUT_CATEGORIES).map(c => `<option>${c}</option>`).join('');
+  const cats = type === 'In' ? getInCategories() : getOutCategories();
+  document.getElementById('txnCategory').innerHTML = cats.map(c => `<option>${c}</option>`).join('');
+}
+
+function ensureCategoryOption(category) {
+  if (!category) return;
+  const sel = document.getElementById('txnCategory');
+  if (![...sel.options].some(o => o.value === category)) {
+    const opt = document.createElement('option');
+    opt.value = category;
+    opt.textContent = category;
+    sel.appendChild(opt);
+  }
 }
 
 export function render() {
@@ -43,7 +58,9 @@ export function render() {
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } }, scales: { y: { beginAtZero: true } } }
   });
 
-  const expenseCats   = OUT_CATEGORIES.filter(c => data.transactions.some(t => t.type === 'Out' && t.category === c));
+  const knownOut = getOutCategories();
+  const orphanOut = [...new Set(data.transactions.filter(t => t.type === 'Out' && t.category && !knownOut.includes(t.category)).map(t => t.category))];
+  const expenseCats   = [...knownOut, ...orphanOut].filter(c => data.transactions.some(t => t.type === 'Out' && t.category === c));
   const expenseTotals = expenseCats.map(c => data.transactions.filter(t => t.type === 'Out' && t.category === c).reduce((s, t) => s + Number(t.amount || 0), 0));
   destroyChart('expenseCategory');
   charts.expenseCategory = new Chart(document.getElementById('chartExpenseCategory'), {
@@ -91,7 +108,9 @@ export function openModal(id) {
   document.getElementById('txnId').value = id || '';
   document.getElementById('txnType').value = t ? t.type : 'Out';
   onTxnTypeChange();
-  document.getElementById('txnCategory').value = t ? t.category : OUT_CATEGORIES[0];
+  if (t) ensureCategoryOption(t.category);
+  const outCats = getOutCategories();
+  document.getElementById('txnCategory').value = t ? t.category : (outCats[0] || '');
   document.getElementById('txnAmount').value = t ? t.amount : '';
   document.getElementById('txnDate').value = t ? t.date : todayStr();
   document.getElementById('txnProject').innerHTML = '<option value="">&mdash;</option>' + data.projects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');

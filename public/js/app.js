@@ -7,6 +7,7 @@ import * as budget    from './modules/budget.js';
 import * as finance   from './modules/finance.js';
 import * as leads     from './modules/leads.js';
 import * as partners  from './modules/partners.js';
+import * as settings  from './modules/settings.js';
 import { watchFirestore } from './data.js';
 
 function closeModal(id) {
@@ -23,6 +24,7 @@ function renderAll() {
   finance.render();
   leads.render();
   partners.render();
+  settings.render();
 }
 
 projects.init(renderAll, closeModal);
@@ -31,6 +33,7 @@ team.init(renderAll, closeModal);
 finance.init(renderAll, closeModal);
 leads.init(renderAll, closeModal);
 partners.init(renderAll, closeModal);
+settings.init(renderAll);
 
 window.closeModal            = closeModal;
 window.openProjectModal      = id => projects.openModal(id);
@@ -57,6 +60,9 @@ window.openRunDividendsModal = ()  => partners.openRunDividendsModal();
 window.runDividends          = ()  => partners.runDividends();
 window.updateDividendPreview = ()  => partners.updateDividendPreview();
 window.onPartnerShareTypeChange = () => partners.onPartnerShareTypeChange();
+window.addCategory    = kind => settings.addCategory(kind);
+window.renameCategory = (kind, index) => settings.renameCategory(kind, index);
+window.deleteCategory = (kind, index) => settings.deleteCategory(kind, index);
 
 document.getElementById('tabs').addEventListener('click', e => {
   const btn = e.target.closest('button[data-tab]');
