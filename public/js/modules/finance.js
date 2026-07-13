@@ -1,5 +1,5 @@
 import { data, save, uid, getOutCategories, getInCategories } from '../data.js';
-import { fmtMoney, fmtDate, todayStr, monthKey, monthLabel, projectName, memberName } from '../helpers.js';
+import { fmtMoney, fmtDate, todayStr, monthKey, monthLabel, projectName, memberName, totalIn, totalOut } from '../helpers.js';
 import { charts, destroyChart } from '../charts.js';
 
 let _renderAll, _closeModal;
@@ -36,14 +36,14 @@ function ensureCategoryOption(category) {
 
 export function render() {
   populateFilterOptions();
-  const totalIn  = data.transactions.filter(t => t.type === 'In').reduce((s, t)  => s + Number(t.amount || 0), 0);
-  const totalOut = data.transactions.filter(t => t.type === 'Out').reduce((s, t) => s + Number(t.amount || 0), 0);
-  const net      = totalIn - totalOut;
+  const inTotal  = totalIn();
+  const outTotal = totalOut();
+  const net      = inTotal - outTotal;
   const monthlyPayroll = data.team.reduce((s, m) => s + Number(m.salary || 0), 0);
 
   document.getElementById('financeKpiGrid').innerHTML = `
-    <div class="kpi"><div class="label">Total In</div><div class="value" style="color:var(--green)">${fmtMoney(totalIn)}</div></div>
-    <div class="kpi"><div class="label">Total Out</div><div class="value" style="color:var(--red)">${fmtMoney(totalOut)}</div></div>
+    <div class="kpi"><div class="label">Total In</div><div class="value" style="color:var(--green)">${fmtMoney(inTotal)}</div></div>
+    <div class="kpi"><div class="label">Total Out</div><div class="value" style="color:var(--red)">${fmtMoney(outTotal)}</div></div>
     <div class="kpi"><div class="label">Net</div><div class="value" style="color:${net < 0 ? 'var(--red)' : 'var(--green)'}">${fmtMoney(net)}</div></div>
     <div class="kpi"><div class="label">Monthly Payroll</div><div class="value">${fmtMoney(monthlyPayroll)}</div><div class="note">${data.team.filter(m => Number(m.salary || 0) > 0).length} salaried</div></div>
   `;

@@ -1,5 +1,5 @@
 import { data, save, uid } from '../data.js';
-import { fmtMoney, fmtDate, slugStatus, todayStr } from '../helpers.js';
+import { fmtMoney, fmtDate, slugStatus, todayStr, projectSpent } from '../helpers.js';
 
 let _renderAll, _closeModal;
 export function init(renderAll, closeModal) { _renderAll = renderAll; _closeModal = closeModal; }
@@ -7,7 +7,9 @@ export function init(renderAll, closeModal) { _renderAll = renderAll; _closeModa
 export function render() {
   const filter = document.getElementById('projStatusFilter').value;
   const rows = data.projects.filter(p => !filter || p.status === filter).map(p => {
-    const pct = p.budget ? Math.min(100, Math.round(p.spent / p.budget * 100)) : 0;
+    const spent = projectSpent(p.id);
+    const budget = Number(p.budget || 0);
+    const pct = budget ? Math.min(100, Math.round(spent / budget * 100)) : 0;
     return `<tr>
       <td><strong>${p.name}</strong><div style="color:var(--text-muted);font-size:11.5px">${p.client || ''}</div></td>
       <td><span class="badge status-${slugStatus(p.status)}">${p.status}</span></td>
@@ -15,7 +17,7 @@ export function render() {
       <td>${fmtDate(p.start)} &rarr; ${fmtDate(p.end)}</td>
       <td style="min-width:120px">
         <div class="progress-bar"><div style="width:${pct}%;background:${pct >= 100 ? 'var(--red)' : 'var(--accent)'}"></div></div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${fmtMoney(p.spent)} / ${fmtMoney(p.budget)} (${pct}%)</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${fmtMoney(spent)} / ${fmtMoney(budget)} (${pct}%)</div>
       </td>
       <td class="actions"><button class="btn small secondary" onclick="openProjectModal('${p.id}')">Edit</button></td>
     </tr>`;
@@ -36,7 +38,8 @@ export function openModal(id) {
   document.getElementById('projectStatus').value = p ? p.status : 'Active';
   document.getElementById('projectPriority').value = p ? p.priority : 'Medium';
   document.getElementById('projectBudget').value = p ? p.budget : 0;
-  document.getElementById('projectSpent').value = p ? p.spent : 0;
+  const spent = p ? projectSpent(p.id) : 0;
+  document.getElementById('projectSpent').value = spent;
   document.getElementById('projectDeleteBtn').style.display = p ? 'inline-block' : 'none';
   document.getElementById('projectModalOverlay').classList.add('open');
 }
@@ -45,6 +48,7 @@ export function saveModal() {
   const id = document.getElementById('projectId').value;
   const name = document.getElementById('projectName').value.trim();
   if (!name) { alert('Project name is required.'); return; }
+  const existing = id ? data.projects.find(x => x.id === id) : null;
   const obj = {
     id: id || uid('p'), name,
     client: document.getElementById('projectClient').value.trim(),
@@ -53,7 +57,8 @@ export function saveModal() {
     status: document.getElementById('projectStatus').value,
     priority: document.getElementById('projectPriority').value,
     budget: Number(document.getElementById('projectBudget').value) || 0,
-    spent: Number(document.getElementById('projectSpent').value) || 0
+    // Spent is derived from Finance Out transactions — keep field for backwards compat only
+    spent: existing ? projectSpent(existing.id) : 0
   };
   if (id) { data.projects[data.projects.findIndex(x => x.id === id)] = obj; }
   else { data.projects.push(obj); }

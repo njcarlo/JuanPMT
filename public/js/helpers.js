@@ -41,6 +41,59 @@ export function memberName(id) {
   return m ? m.name : '—';
 }
 
+/** Sum of Out transactions tagged to a project (true spent). */
+export function projectSpent(projectId) {
+  if (!projectId) return 0;
+  return data.transactions
+    .filter(t => t.type === 'Out' && t.project === projectId)
+    .reduce((s, t) => s + Number(t.amount || 0), 0);
+}
+
+/** Sum of In transactions tagged to a project. */
+export function projectIncome(projectId) {
+  if (!projectId) return 0;
+  return data.transactions
+    .filter(t => t.type === 'In' && t.project === projectId)
+    .reduce((s, t) => s + Number(t.amount || 0), 0);
+}
+
+export function totalBudget() {
+  return data.projects.reduce((s, p) => s + Number(p.budget || 0), 0);
+}
+
+export function totalProjectSpent() {
+  return data.projects.reduce((s, p) => s + projectSpent(p.id), 0);
+}
+
+export function totalProjectIncome() {
+  return data.projects.reduce((s, p) => s + projectIncome(p.id), 0);
+}
+
+/** All Out transactions (including unallocated). */
+export function totalOut() {
+  return data.transactions
+    .filter(t => t.type === 'Out')
+    .reduce((s, t) => s + Number(t.amount || 0), 0);
+}
+
+/** All In transactions. */
+export function totalIn() {
+  return data.transactions
+    .filter(t => t.type === 'In')
+    .reduce((s, t) => s + Number(t.amount || 0), 0);
+}
+
+export function financeNet() {
+  return totalIn() - totalOut();
+}
+
+/** Out expenses not linked to any project. */
+export function unallocatedOut() {
+  return data.transactions
+    .filter(t => t.type === 'Out' && !t.project)
+    .reduce((s, t) => s + Number(t.amount || 0), 0);
+}
+
 export function statusColor(status) {
   const map = {
     'Active': 'var(--blue)', 'In Progress': 'var(--blue)',

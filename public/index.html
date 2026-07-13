@@ -249,8 +249,12 @@
       </div>
     </div>
     <div class="field-row">
-      <div class="field"><label>Budget ($)</label><input type="number" id="projectBudget" min="0" step="100"></div>
-      <div class="field"><label>Spent ($)</label><input type="number" id="projectSpent" min="0" step="100"></div>
+      <div class="field"><label>Budget (₱)</label><input type="number" id="projectBudget" min="0" step="100"></div>
+      <div class="field">
+        <label>Spent (from Finance)</label>
+        <input type="number" id="projectSpent" min="0" step="100" readonly tabindex="-1" style="background:var(--gray-bg);color:var(--text-muted)">
+        <div style="font-size:11.5px;color:var(--text-muted);margin-top:4px">Sum of Out transactions tagged to this project</div>
+      </div>
     </div>
     <div class="modal-actions">
       <button class="btn danger" id="projectDeleteBtn" style="display:none" onclick="deleteProject()">Delete</button>

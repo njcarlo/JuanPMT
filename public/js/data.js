@@ -39,6 +39,12 @@ function migrate(d) {
   PROTECTED_OUT_CATEGORIES.forEach(c => {
     if (!d.outCategories.includes(c)) d.outCategories.unshift(c);
   });
+  // Align cached spent with Finance Out transactions
+  d.projects.forEach(p => {
+    p.spent = (d.transactions || [])
+      .filter(t => t.type === 'Out' && t.project === p.id)
+      .reduce((s, t) => s + Number(t.amount || 0), 0);
+  });
   return d;
 }
 
@@ -67,6 +73,12 @@ export const OUT_CATEGORIES = DEFAULT_OUT_CATEGORIES;
 export const IN_CATEGORIES = DEFAULT_IN_CATEGORIES;
 
 export function save() {
+  // Keep legacy project.spent caches aligned with Finance Out transactions
+  data.projects.forEach(p => {
+    p.spent = data.transactions
+      .filter(t => t.type === 'Out' && t.project === p.id)
+      .reduce((s, t) => s + Number(t.amount || 0), 0);
+  });
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   setDoc(DATA_DOC, JSON.parse(JSON.stringify(data))).catch(() => {});
 }

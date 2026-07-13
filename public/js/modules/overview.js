@@ -1,20 +1,25 @@
 import { data } from '../data.js';
-import { fmtMoney, fmtDate, daysBetween, todayStr, slugStatus, projectName, memberName } from '../helpers.js';
+import {
+  fmtMoney, fmtDate, daysBetween, todayStr, slugStatus,
+  projectName, memberName, projectSpent, totalBudget, totalProjectSpent, financeNet
+} from '../helpers.js';
 import { charts, destroyChart } from '../charts.js';
 
 export function render() {
   const activeProjects = data.projects.filter(p => p.status === 'Active').length;
   const overdue = data.tasks.filter(t => t.status !== 'Done' && t.due < todayStr()).length;
   const dueSoon = data.tasks.filter(t => t.status !== 'Done' && t.due >= todayStr() && daysBetween(todayStr(), t.due) <= 7).length;
-  const totalBudget = data.projects.reduce((s, p) => s + Number(p.budget || 0), 0);
-  const totalSpent  = data.projects.reduce((s, p) => s + Number(p.spent  || 0), 0);
-  const util = totalBudget ? Math.round(totalSpent / totalBudget * 100) : 0;
+  const budget = totalBudget();
+  const spent  = totalProjectSpent();
+  const remaining = budget - spent;
+  const util = budget ? Math.round(spent / budget * 100) : 0;
+  const net = financeNet();
 
   document.getElementById('kpiGrid').innerHTML = `
     <div class="kpi"><div class="label">Active Projects</div><div class="value">${activeProjects}</div><div class="note">${data.projects.length} total</div></div>
     <div class="kpi"><div class="label">Overdue Tasks</div><div class="value" style="color:${overdue ? 'var(--red)' : 'inherit'}">${overdue}</div><div class="note">needs attention</div></div>
-    <div class="kpi"><div class="label">Due in 7 Days</div><div class="value">${dueSoon}</div><div class="note">upcoming</div></div>
-    <div class="kpi"><div class="label">Budget Utilization</div><div class="value">${util}%</div><div class="note">${fmtMoney(totalSpent)} / ${fmtMoney(totalBudget)}</div></div>
+    <div class="kpi"><div class="label">Budget Remaining</div><div class="value" style="color:${remaining < 0 ? 'var(--red)' : 'inherit'}">${fmtMoney(remaining)}</div><div class="note">${util}% used · ${fmtMoney(spent)} spent</div></div>
+    <div class="kpi"><div class="label">Finance Net</div><div class="value" style="color:${net < 0 ? 'var(--red)' : 'var(--green)'}">${fmtMoney(net)}</div><div class="note">all income − expenses</div></div>
   `;
 
   const statuses = ['To Do', 'In Progress', 'Review', 'Done'];
@@ -32,8 +37,8 @@ export function render() {
     data: {
       labels: data.projects.map(p => p.name),
       datasets: [
-        { label: 'Budget', data: data.projects.map(p => p.budget), backgroundColor: '#c7d2fe' },
-        { label: 'Spent',  data: data.projects.map(p => p.spent),  backgroundColor: '#4f46e5' }
+        { label: 'Budget', data: data.projects.map(p => Number(p.budget || 0)), backgroundColor: '#c7d2fe' },
+        { label: 'Spent',  data: data.projects.map(p => projectSpent(p.id)),  backgroundColor: '#4f46e5' }
       ]
     },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } }, scales: { x: { ticks: { font: { size: 10 } } }, y: { beginAtZero: true } } }
