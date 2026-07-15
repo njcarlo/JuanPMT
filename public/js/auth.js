@@ -1,7 +1,5 @@
-import {
-  SUPERADMIN_USERNAME, USERS_COL, userDocRef, normalizeUsername,
-  getDoc, setDoc, deleteDoc, getDocs
-} from './firebase-config.js';
+import { SUPERADMIN_USERNAME, normalizeUsername } from './firebase-config.js';
+import { data, saveAsync, syncFromRemote } from './data.js';
 
 export { SUPERADMIN_USERNAME };
 
@@ -9,6 +7,11 @@ const SESSION_KEY = 'juanpmt_session_v1';
 
 /** @type {{ username: string, name: string, role: string, active: boolean } | null} */
 export let currentUser = null;
+
+function ensureLogins() {
+  if (!data.logins || typeof data.logins !== 'object') data.logins = {};
+  return data.logins;
+}
 
 export function isSuperadmin() {
   return !!(currentUser && (
@@ -18,8 +21,11 @@ export function isSuperadmin() {
 }
 
 async function hashPassword(password) {
-  const data = new TextEncoder().encode(String(password));
-  const buf = await crypto.subtle.digest('SHA-256', data);
+  if (!globalThis.crypto?.subtle) {
+    throw new Error('Secure browser context required (open the site via HTTPS).');
+  }
+  const bytes = new TextEncoder().encode(String(password));
+  const buf = await crypto.subtle.digest('SHA-256', bytes);
   return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
@@ -37,18 +43,17 @@ function clearSession() {
   localStorage.removeItem(SESSION_KEY);
 }
 
-function profileFromDoc(username, data) {
+function profileFromRecord(username, record) {
   return {
     username,
-    name: data.name || username,
-    role: data.role || 'user',
-    active: data.active !== false
+    name: record.name || username,
+    role: record.role || 'user',
+    active: record.active !== false
   };
 }
 
 /**
- * Restore session from localStorage and re-validate against Firestore.
- * Calls onChange(user|null, err?).
+ * Restore session from localStorage and re-validate against stored logins.
  */
 export function watchAuth(onChange) {
   (async () => {
@@ -61,13 +66,13 @@ export function watchAuth(onChange) {
       }
       const cached = JSON.parse(raw);
       const username = normalizeUsername(cached.username);
-      const snap = await getDoc(userDocRef(username));
-      if (!snap.exists() || snap.data().active === false) {
+      const record = ensureLogins()[username];
+      if (!record || record.active === false) {
         clearSession();
         onChange(null);
         return;
       }
-      const user = profileFromDoc(username, snap.data());
+      const user = profileFromRecord(username, record);
       saveSession(user);
       onChange(user);
     } catch (err) {
@@ -76,7 +81,6 @@ export function watchAuth(onChange) {
     }
   })();
 
-  // No realtime auth listener without Firebase Auth — return a no-op unsubscribe
   return () => {};
 }
 
@@ -84,21 +88,21 @@ export async function login(username, password) {
   const user = normalizeUsername(username);
   if (!user || !password) throw new Error('Username and password are required.');
 
-  const snap = await getDoc(userDocRef(user));
-  if (!snap.exists()) throw new Error('Incorrect username or password.');
+  try { await syncFromRemote(); } catch (_) { /* use local copy if offline */ }
 
-  const data = snap.data();
-  if (data.active === false) throw new Error('This account has been deactivated.');
+  const record = ensureLogins()[user];
+  if (!record) throw new Error('Incorrect username or password.');
+  if (record.active === false) throw new Error('This account has been deactivated.');
 
   const hash = await hashPassword(password);
-  if (data.passwordHash !== hash) throw new Error('Incorrect username or password.');
+  if (record.passwordHash !== hash) throw new Error('Incorrect username or password.');
 
-  const profile = profileFromDoc(user, data);
+  const profile = profileFromRecord(user, record);
   saveSession(profile);
   return profile;
 }
 
-/** First-time setup: create the superadmin account in Firestore. */
+/** First-time setup: create the superadmin account inside pmt/main.logins. */
 export async function register(username, password, name) {
   const user = normalizeUsername(username);
   if (user !== SUPERADMIN_USERNAME) {
@@ -106,19 +110,27 @@ export async function register(username, password, name) {
   }
   if (!password || password.length < 4) throw new Error('Password must be at least 4 characters.');
 
-  const existing = await getDoc(userDocRef(user));
-  if (existing.exists()) throw new Error('Superadmin already exists. Sign in instead.');
+  try { await syncFromRemote(); } catch (_) { /* first install may have no doc yet */ }
 
-  const profile = {
-    username: user,
+  const logins = ensureLogins();
+  if (logins[user]) throw new Error('Superadmin already exists. Sign in instead.');
+
+  logins[user] = {
     name: (name || '').trim() || 'Superadmin',
     role: 'superadmin',
     active: true,
     passwordHash: await hashPassword(password),
     createdAt: new Date().toISOString()
   };
-  await setDoc(userDocRef(user), profile);
-  const session = profileFromDoc(user, profile);
+
+  try {
+    await saveAsync();
+  } catch (err) {
+    delete logins[user];
+    throw err;
+  }
+
+  const session = profileFromRecord(user, logins[user]);
   saveSession(session);
   return session;
 }
@@ -128,16 +140,16 @@ export async function logout() {
 }
 
 export async function listUsers() {
-  const snap = await getDocs(USERS_COL);
-  return snap.docs
-    .map(d => {
-      const data = d.data();
+  const logins = ensureLogins();
+  return Object.keys(logins)
+    .map(username => {
+      const record = logins[username];
       return {
-        username: d.id,
-        name: data.name || d.id,
-        role: data.role || 'user',
-        active: data.active !== false,
-        createdAt: data.createdAt || ''
+        username,
+        name: record.name || username,
+        role: record.role || 'user',
+        active: record.active !== false,
+        createdAt: record.createdAt || ''
       };
     })
     .sort((a, b) => {
@@ -157,11 +169,12 @@ export async function createAppUser({ username, password, name }) {
   }
   if (user === SUPERADMIN_USERNAME) throw new Error('That username is reserved for the superadmin.');
 
-  const snap = await getDoc(userDocRef(user));
-  if (snap.exists()) throw new Error('That username already exists.');
+  try { await syncFromRemote(); } catch (_) {}
 
-  const profile = {
-    username: user,
+  const logins = ensureLogins();
+  if (logins[user]) throw new Error('That username already exists.');
+
+  logins[user] = {
     name: (name || '').trim() || user,
     role: 'user',
     active: true,
@@ -169,8 +182,15 @@ export async function createAppUser({ username, password, name }) {
     createdAt: new Date().toISOString(),
     createdBy: currentUser.username
   };
-  await setDoc(userDocRef(user), profile);
-  return { username: user, name: profile.name, role: 'user', active: true };
+
+  try {
+    await saveAsync();
+  } catch (err) {
+    delete logins[user];
+    throw err;
+  }
+
+  return { username: user, name: logins[user].name, role: 'user', active: true };
 }
 
 export async function setUserActive(username, active) {
@@ -178,10 +198,11 @@ export async function setUserActive(username, active) {
   const user = normalizeUsername(username);
   if (user === currentUser?.username) throw new Error('You cannot deactivate yourself.');
   if (user === SUPERADMIN_USERNAME) throw new Error('Cannot deactivate the superadmin.');
-  const ref = userDocRef(user);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) throw new Error('User not found.');
-  await setDoc(ref, { active: !!active, updatedAt: new Date().toISOString() }, { merge: true });
+  const logins = ensureLogins();
+  if (!logins[user]) throw new Error('User not found.');
+  logins[user].active = !!active;
+  logins[user].updatedAt = new Date().toISOString();
+  await saveAsync();
 }
 
 export async function removeUser(username) {
@@ -189,12 +210,20 @@ export async function removeUser(username) {
   const user = normalizeUsername(username);
   if (user === currentUser?.username) throw new Error('You cannot remove yourself.');
   if (user === SUPERADMIN_USERNAME) throw new Error('Cannot remove the superadmin.');
-  const ref = userDocRef(user);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) throw new Error('User not found.');
-  await deleteDoc(ref);
+  const logins = ensureLogins();
+  if (!logins[user]) throw new Error('User not found.');
+  delete logins[user];
+  await saveAsync();
 }
 
 export function authErrorMessage(err) {
+  const code = err?.code || '';
+  const msg = String(err?.message || '');
+  if (code === 'permission-denied' || /permission|insufficient/i.test(msg)) {
+    return 'Firestore blocked the write. Deploy rules or check Console permissions, then try again.';
+  }
+  if (/secure browser|crypto\.subtle/i.test(msg)) {
+    return 'Open the site over HTTPS (e.g. https://juanpmt.web.app), then try again.';
+  }
   return err?.message || 'Something went wrong.';
 }

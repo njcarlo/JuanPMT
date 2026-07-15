@@ -97,6 +97,10 @@ function setRegisterMode(on) {
   loginNameField.hidden = !on;
   loginSubmitBtn.textContent = on ? 'Create superadmin account' : 'Sign in';
   toggleRegisterBtn.textContent = on ? 'Back to sign in' : 'Create superadmin account';
+  if (on) {
+    const userInput = document.getElementById('loginUsername');
+    if (userInput && !userInput.value.trim()) userInput.value = SUPERADMIN_USERNAME;
+  }
   showLoginError('');
 }
 

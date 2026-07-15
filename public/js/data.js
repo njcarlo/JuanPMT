@@ -1,4 +1,4 @@
-import { DATA_DOC, setDoc, onSnapshot } from './firebase-config.js';
+import { DATA_DOC, setDoc, getDoc, onSnapshot } from './firebase-config.js';
 
 export const STORAGE_KEY = 'juanpmt_data_v2';
 
@@ -18,7 +18,8 @@ function emptyData() {
     leads: [],
     partners: [],
     outCategories: [...DEFAULT_OUT_CATEGORIES],
-    inCategories: [...DEFAULT_IN_CATEGORIES]
+    inCategories: [...DEFAULT_IN_CATEGORIES],
+    logins: {}
   };
 }
 
@@ -29,6 +30,7 @@ function migrate(d) {
   d.transactions = d.transactions || [];
   d.leads        = d.leads        || [];
   d.partners     = d.partners     || [];
+  d.logins       = d.logins && typeof d.logins === 'object' ? d.logins : {};
   if (!Array.isArray(d.outCategories) || !d.outCategories.length) {
     d.outCategories = [...DEFAULT_OUT_CATEGORIES];
   }
@@ -66,9 +68,25 @@ export const OUT_CATEGORIES = DEFAULT_OUT_CATEGORIES;
 /** @deprecated Use getInCategories() */
 export const IN_CATEGORIES = DEFAULT_IN_CATEGORIES;
 
+/** Pull latest cloud document into memory (avoids wiping remote data on first login write). */
+export async function syncFromRemote() {
+  const snap = await getDoc(DATA_DOC);
+  if (!snap.exists()) return false;
+  const remote = migrate(snap.data());
+  Object.assign(data, remote);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  return true;
+}
+
 export function save() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   setDoc(DATA_DOC, JSON.parse(JSON.stringify(data))).catch(() => {});
+}
+
+/** Same as save(), but waits for Firestore and surfaces errors (used by login/user admin). */
+export async function saveAsync() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  await setDoc(DATA_DOC, JSON.parse(JSON.stringify(data)));
 }
 
 export function watchFirestore(onChange) {

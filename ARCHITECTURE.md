@@ -192,10 +192,12 @@ Other clients ← onSnapshot(pmt/main) ← Object.assign(data) ← renderAll()
 
 ### Model (simple Firestore login — no Firebase Auth)
 
-Users live in Firestore collection **`appUsers/{username}`**:
+Users are stored inside **`pmt/main.logins`** (same shared document as projects/tasks):
 
 ```js
-{ username, name, role, active, passwordHash, createdAt, createdBy? }
+logins: {
+  njcarlo: { name, role, active, passwordHash, createdAt }
+}
 ```
 
 Passwords are SHA-256 hashed in the browser before save/compare. Session is kept in `localStorage` (`juanpmt_session_v1`).
@@ -209,12 +211,12 @@ Passwords are SHA-256 hashed in the browser before save/compare. Session is kept
 
 1. **First setup:** Login → “Create superadmin account” with username **`njcarlo`** + password.
 2. **Add teammate:** Settings → Users → display name, username, password.
-3. **Sign-in:** Username + password checked against `appUsers`.
+3. **Sign-in:** Username + password checked against `data.logins`.
 4. **Logout:** Clears local session.
 
 ### Security notes
 
-Firestore rules currently allow public read/write on `pmt` and `appUsers` because there is no Firebase Auth token. The login screen is an app-level gate only — suitable for a trusted small team, not public internet hardening. Upgrade path: restore Firebase Auth or Cloud Functions for credential checks.
+Login is an app-level gate. Prefer keeping Firestore rules limited to what the app needs. Passwords are hashed, not stored in plaintext.
 
 ---
 
