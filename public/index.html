@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>JuanPMT</title>
-<link rel="stylesheet" href="css/styles.css?v=20260715g">
+<link rel="stylesheet" href="css/styles.css?v=20260715h">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
 </head>
 <body>
@@ -41,23 +41,11 @@
 
 <div id="app" hidden>
   <header class="top">
-    <div>
-      <h1>JuanPMT</h1>
-      <div class="sub">Project management &mdash; projects, tasks, timeline, team, budget, finance, leads &amp; settings</div>
-    </div>
-    <div class="header-right">
-      <nav class="tabs" id="tabs">
-        <button data-tab="overview" class="active">Overview</button>
-        <button data-tab="projects">Projects</button>
-        <button data-tab="tasks">Tasks</button>
-        <button data-tab="timeline">Timeline</button>
-        <button data-tab="team">Team</button>
-        <button data-tab="budget">Budget</button>
-        <button data-tab="finance">Finance</button>
-        <button data-tab="leads">Leads</button>
-        <button data-tab="partners">Partners</button>
-        <button data-tab="settings">Settings</button>
-      </nav>
+    <div class="header-brand-row">
+      <div>
+        <h1>JuanPMT</h1>
+        <div class="sub">Project management &mdash; projects, tasks, timeline, team, budget, finance, leads &amp; settings</div>
+      </div>
       <div class="user-chip" id="userChip">
         <div class="user-chip-text">
           <strong id="userChipName">—</strong>
@@ -66,6 +54,18 @@
         <button type="button" class="btn small secondary" id="logoutBtn">Log out</button>
       </div>
     </div>
+    <nav class="tabs" id="tabs">
+      <button data-tab="overview" class="active">Overview</button>
+      <button data-tab="projects">Projects</button>
+      <button data-tab="tasks">Tasks</button>
+      <button data-tab="timeline">Timeline</button>
+      <button data-tab="team">Team</button>
+      <button data-tab="budget">Budget</button>
+      <button data-tab="finance">Finance</button>
+      <button data-tab="leads">Leads</button>
+      <button data-tab="partners">Partners</button>
+      <button data-tab="settings">Settings</button>
+    </nav>
   </header>
 
   <!-- OVERVIEW -->
@@ -201,50 +201,57 @@
 
   <!-- SETTINGS -->
   <section class="panel" id="panel-settings">
-    <div class="card" id="settingsUsersCard" style="margin-bottom:16px" hidden>
-      <h2>Users</h2>
-      <p style="margin:0 0 12px;color:var(--text-muted);font-size:13px;line-height:1.45">
-        Add people who can sign in. Only the superadmin can manage users.
-        Accounts are stored in the shared app database with a username and password.
+    <div class="card" id="settingsUsersCard" hidden>
+      <h2>People who can log in</h2>
+      <p class="card-desc">
+        Create usernames and passwords for teammates. Only you (superadmin) can manage access.
       </p>
-      <div class="toolbar" style="margin-bottom:12px">
-        <div class="filters" style="flex:1;flex-wrap:wrap">
-          <input type="text" id="newUserName" placeholder="Display name" style="min-width:140px">
-          <input type="text" id="newUserUsername" placeholder="Username" style="min-width:140px" autocomplete="off">
-          <input type="password" id="newUserPassword" placeholder="Password" minlength="4" style="min-width:140px" autocomplete="new-password">
+      <div class="settings-user-form">
+        <div class="field">
+          <label for="newUserName">Display name</label>
+          <input type="text" id="newUserName" placeholder="e.g. Alex Rivera" autocomplete="off">
         </div>
-        <button class="btn" onclick="addUser()">+ Add user</button>
+        <div class="field">
+          <label for="newUserUsername">Username</label>
+          <input type="text" id="newUserUsername" placeholder="e.g. alex" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="newUserPassword">Password</label>
+          <input type="password" id="newUserPassword" placeholder="At least 4 characters" minlength="4" autocomplete="new-password">
+        </div>
+        <div class="settings-user-form-action">
+          <button type="button" class="btn" id="addUserBtn" onclick="addUser()">+ Add person</button>
+        </div>
       </div>
       <div id="settingsUsersList"></div>
     </div>
 
-    <div class="card" style="margin-bottom:16px">
+    <div class="card">
       <h2>Transaction categories</h2>
-      <p style="margin:0;color:var(--text-muted);font-size:13px;line-height:1.45">
-        Customize the categories available when logging income (In) or expenses (Out).
-        Salary and Dividend are system categories used by payroll and partner dividends.
+      <p class="card-desc">
+        Categories for income (In) and expenses (Out). Salary and Dividend are system categories used by payroll and partner dividends.
       </p>
-    </div>
-    <div class="card-row">
-      <div class="card">
-        <h2>Expense categories (Out)</h2>
-        <div class="toolbar" style="margin-bottom:12px">
-          <div class="filters" style="flex:1">
-            <input type="text" id="newOutCategory" placeholder="New expense category" style="min-width:180px;flex:1">
+      <div class="card-row settings-cat-row">
+        <div class="settings-cat-col">
+          <h3 class="settings-subhead">Expense categories (Out)</h3>
+          <div class="toolbar" style="margin-bottom:12px">
+            <div class="filters" style="flex:1">
+              <input type="text" id="newOutCategory" placeholder="New expense category" style="min-width:160px;flex:1">
+            </div>
+            <button class="btn" onclick="addCategory('out')">+ Add</button>
           </div>
-          <button class="btn" onclick="addCategory('out')">+ Add</button>
+          <div id="settingsOutCategories"></div>
         </div>
-        <div id="settingsOutCategories"></div>
-      </div>
-      <div class="card">
-        <h2>Income categories (In)</h2>
-        <div class="toolbar" style="margin-bottom:12px">
-          <div class="filters" style="flex:1">
-            <input type="text" id="newInCategory" placeholder="New income category" style="min-width:180px;flex:1">
+        <div class="settings-cat-col">
+          <h3 class="settings-subhead">Income categories (In)</h3>
+          <div class="toolbar" style="margin-bottom:12px">
+            <div class="filters" style="flex:1">
+              <input type="text" id="newInCategory" placeholder="New income category" style="min-width:160px;flex:1">
+            </div>
+            <button class="btn" onclick="addCategory('in')">+ Add</button>
           </div>
-          <button class="btn" onclick="addCategory('in')">+ Add</button>
+          <div id="settingsInCategories"></div>
         </div>
-        <div id="settingsInCategories"></div>
       </div>
     </div>
   </section>
@@ -457,7 +464,7 @@
   var SESSION_KEY = 'juanpmt_session_v1';
   var FALLBACK_HASH = '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8';
   var REST = 'https://firestore.googleapis.com/v1/projects/juanpmt/databases/(default)/documents/pmt/main?key=AIzaSyCszORDc4Ak23E0YCqOO7f93oNSG1Wa08Q';
-  var BOOT_TAG = 'boot-20260715g';
+  var BOOT_TAG = 'boot-20260715h';
 
   function showErr(msg) {
     var el = document.getElementById('loginError');
@@ -519,7 +526,7 @@
     } catch (e) {}
     paintSession(user);
     // Navigate so modules pick up the session with fresh CSS/JS
-    location.replace('/?in=' + Date.now() + '&v=20260715g');
+    location.replace('/?in=' + Date.now() + '&v=20260715h');
   }
 
   function fetchLogins(timeoutMs) {
@@ -629,7 +636,7 @@
 </script>
 <script type="module">
 window.__juanpmtReady = false;
-import('./js/app.js?v=20260715g').then(function () {
+import('./js/app.js?v=20260715h').then(function () {
   window.__juanpmtReady = true;
 }).catch(function (err) {
   console.error(err);

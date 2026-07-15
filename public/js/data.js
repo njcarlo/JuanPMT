@@ -1,4 +1,4 @@
-import { DATA_DOC, setDoc, getDoc, onSnapshot } from './firebase-config.js?v=20260715g';
+import { DATA_DOC, setDoc, getDoc, onSnapshot } from './firebase-config.js';
 
 export const STORAGE_KEY = 'juanpmt_data_v2';
 
@@ -87,6 +87,12 @@ export function save() {
 export async function saveAsync() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   await setDoc(DATA_DOC, JSON.parse(JSON.stringify(data)));
+}
+
+/** Persist only logins (safer for user admin if full sync timed out). */
+export async function saveLoginsAsync() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  await setDoc(DATA_DOC, { logins: JSON.parse(JSON.stringify(data.logins || {})) }, { merge: true });
 }
 
 export function watchFirestore(onChange) {

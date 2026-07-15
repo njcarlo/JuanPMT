@@ -1,5 +1,5 @@
-import { SUPERADMIN_USERNAME, normalizeUsername, mainDocRestUrl } from './firebase-config.js?v=20260715g';
-import { data, saveAsync, syncFromRemote } from './data.js?v=20260715g';
+import { SUPERADMIN_USERNAME, normalizeUsername, mainDocRestUrl } from './firebase-config.js';
+import { data, saveAsync, saveLoginsAsync, syncFromRemote } from './data.js';
 
 export { SUPERADMIN_USERNAME };
 
@@ -148,6 +148,18 @@ function fetchLoginsXHR(timeoutMs) {
 
 async function fetchLoginsFromCloud() {
   return fetchLoginsXHR(CLOUD_TIMEOUT_MS);
+}
+
+async function softSync() {
+  try {
+    await Promise.race([
+      syncFromRemote(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('sync timeout')), 4000))
+    ]);
+  } catch (_) {}
+  try {
+    await fetchLoginsFromCloud();
+  } catch (_) {}
 }
 
 export function watchAuth(onChange) {
@@ -359,8 +371,7 @@ export async function createAppUser({ username, password, name }) {
   }
   if (user === SUPERADMIN_USERNAME) throw new Error('That username is reserved for the superadmin.');
 
-  try { await syncFromRemote(); } catch (_) {}
-  try { await fetchLoginsFromCloud(); } catch (_) {}
+  await softSync();
 
   const logins = ensureLogins();
   if (logins[user]) throw new Error('That username already exists.');
@@ -371,11 +382,11 @@ export async function createAppUser({ username, password, name }) {
     active: true,
     passwordHash: await hashPassword(password),
     createdAt: new Date().toISOString(),
-    createdBy: currentUser.username
+    createdBy: currentUser?.username || SUPERADMIN_USERNAME
   };
 
   try {
-    await saveAsync();
+    await saveLoginsAsync();
   } catch (err) {
     delete logins[user];
     throw err;
@@ -389,12 +400,12 @@ export async function setUserActive(username, active) {
   const user = normalizeUsername(username);
   if (user === currentUser?.username) throw new Error('You cannot deactivate yourself.');
   if (user === SUPERADMIN_USERNAME) throw new Error('Cannot deactivate the superadmin.');
-  try { await syncFromRemote(); } catch (_) {}
+  await softSync();
   const logins = ensureLogins();
   if (!logins[user]) throw new Error('User not found.');
   logins[user].active = !!active;
   logins[user].updatedAt = new Date().toISOString();
-  await saveAsync();
+  await saveLoginsAsync();
 }
 
 export async function removeUser(username) {
@@ -402,11 +413,11 @@ export async function removeUser(username) {
   const user = normalizeUsername(username);
   if (user === currentUser?.username) throw new Error('You cannot remove yourself.');
   if (user === SUPERADMIN_USERNAME) throw new Error('Cannot remove the superadmin.');
-  try { await syncFromRemote(); } catch (_) {}
+  await softSync();
   const logins = ensureLogins();
   if (!logins[user]) throw new Error('User not found.');
   delete logins[user];
-  await saveAsync();
+  await saveLoginsAsync();
 }
 
 export function authErrorMessage(err) {

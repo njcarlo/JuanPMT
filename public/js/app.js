@@ -8,11 +8,11 @@ import * as finance   from './modules/finance.js';
 import * as leads     from './modules/leads.js';
 import * as partners  from './modules/partners.js';
 import * as settings  from './modules/settings.js';
-import { watchFirestore } from './data.js?v=20260715g';
+import { watchFirestore } from './data.js';
 import {
   watchAuth, login, register, logout,
   authErrorMessage, SUPERADMIN_USERNAME
-} from './auth.js?v=20260715g';
+} from './auth.js';
 
 function closeModal(id) {
   document.getElementById(id).classList.remove('open');

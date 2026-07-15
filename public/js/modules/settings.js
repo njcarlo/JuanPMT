@@ -84,7 +84,20 @@ async function renderUsers() {
   const listEl = document.getElementById('settingsUsersList');
   if (!card || !listEl) return;
 
-  if (!isSuperadmin()) {
+  // Session fallback in case auth module state was stale
+  let allowed = isSuperadmin();
+  if (!allowed) {
+    try {
+      const raw = localStorage.getItem('juanpmt_session_v1');
+      const cached = raw ? JSON.parse(raw) : null;
+      allowed = !!(cached && (
+        cached.role === 'superadmin' ||
+        cached.username === SUPERADMIN_USERNAME
+      ));
+    } catch (_) {}
+  }
+
+  if (!allowed) {
     card.hidden = true;
     return;
   }
@@ -110,10 +123,10 @@ async function renderUsers() {
       let actions = '';
       if (!isSA && !isSelf) {
         actions = active
-          ? `<button class="btn small secondary" onclick="toggleUserActive('${u.username}', false)">Deactivate</button>
-             <button class="btn small danger" onclick="deleteUser('${u.username}')">Remove</button>`
-          : `<button class="btn small secondary" onclick="toggleUserActive('${u.username}', true)">Reactivate</button>
-             <button class="btn small danger" onclick="deleteUser('${u.username}')">Remove</button>`;
+          ? `<button class="btn small secondary" onclick="toggleUserActive('${escapeHtml(u.username)}', false)">Deactivate</button>
+             <button class="btn small danger" onclick="deleteUser('${escapeHtml(u.username)}')">Remove</button>`
+          : `<button class="btn small secondary" onclick="toggleUserActive('${escapeHtml(u.username)}', true)">Reactivate</button>
+             <button class="btn small danger" onclick="deleteUser('${escapeHtml(u.username)}')">Remove</button>`;
       } else if (isSA) {
         actions = `<span style="color:var(--text-muted);font-size:12px">Protected</span>`;
       }
@@ -130,7 +143,7 @@ async function renderUsers() {
     }).join('');
 
     listEl.innerHTML = `<table>
-      <thead><tr><th>User</th><th>Role</th><th>Status</th><th></th></tr></thead>
+      <thead><tr><th>Person</th><th>Role</th><th>Status</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table>`;
   } catch (err) {

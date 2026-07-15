@@ -31,8 +31,18 @@ body {
 }
 #app { max-width: 1280px; margin: 0 auto; padding: 20px 24px 60px; }
 header.top {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 18px; flex-wrap: wrap; gap: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.header-brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 header.top h1 { font-size: 20px; margin: 0; font-weight: 700; }
 header.top .sub { color: var(--text-muted); font-size: 12.5px; margin-top: 2px; }
@@ -135,7 +145,6 @@ td.actions button { margin-left: 6px; }
 footer.hint { text-align: center; color: var(--text-muted); font-size: 11.5px; margin-top: 24px; }
 
 /* Header + user chip */
-.header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
 .user-chip {
   display: flex; align-items: center; gap: 10px;
   background: var(--panel); border: 1px solid var(--border);
@@ -144,6 +153,29 @@ footer.hint { text-align: center; color: var(--text-muted); font-size: 11.5px; m
 .user-chip-text { display: flex; flex-direction: column; line-height: 1.2; text-align: right; }
 .user-chip-text strong { font-size: 12.5px; }
 .user-chip-text span { font-size: 11px; color: var(--text-muted); }
+
+.card-desc {
+  margin: -4px 0 14px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.settings-user-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  gap: 10px 12px;
+  align-items: end;
+  margin-bottom: 14px;
+}
+.settings-user-form .field { margin-bottom: 0; }
+.settings-user-form-action { padding-bottom: 1px; }
+.settings-subhead {
+  margin: 0 0 10px;
+  font-size: 13.5px;
+  font-weight: 700;
+}
+.settings-cat-row { margin-top: 4px; }
+.settings-cat-col { min-width: 0; padding-top: 4px; }
 
 /* Login */
 .login-screen {
@@ -182,8 +214,8 @@ button.linkish:hover { text-decoration: underline; }
 }
 
 @media (max-width: 900px) {
-  header.top { flex-direction: column; align-items: stretch; }
-  .header-right { align-items: stretch; }
-  .user-chip { justify-content: space-between; }
+  .settings-user-form { grid-template-columns: 1fr; }
+  .settings-user-form-action { justify-self: start; }
+  .user-chip { width: 100%; justify-content: space-between; }
   .user-chip-text { text-align: left; }
 }
