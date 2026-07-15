@@ -1,44 +1,17 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() {
-      return request.auth != null;
-    }
-
-    function email() {
-      return request.auth.token.email.lower();
-    }
-
-    function isHardcodedSuperadmin() {
-      return signedIn() && email() == 'njcarlo@gmail.com';
-    }
-
-    function userDoc() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-    }
-
-    function hasUserDoc() {
-      return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
-    }
-
-    function isActiveUser() {
-      return isHardcodedSuperadmin() ||
-        (hasUserDoc() && userDoc().active != false);
-    }
-
-    function isSuperadmin() {
-      return isHardcodedSuperadmin() ||
-        (hasUserDoc() && userDoc().role == 'superadmin');
-    }
-
+    // Simple username/password gate lives in the app (Firestore appUsers).
+    // No Firebase Auth — open read/write for the app collections.
     match /pmt/{document} {
-      allow read, write: if isActiveUser();
+      allow read, write: if true;
     }
-
+    match /appUsers/{username} {
+      allow read, write: if true;
+    }
+    // Legacy Firebase Auth user profiles (unused after simple login)
     match /users/{userId} {
-      allow read: if signedIn() && (request.auth.uid == userId || isActiveUser());
-      allow create, update: if isSuperadmin();
-      allow delete: if isSuperadmin() && request.auth.uid != userId;
+      allow read, write: if true;
     }
   }
 }
