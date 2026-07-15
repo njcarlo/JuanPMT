@@ -6,7 +6,7 @@ import { data, saveAsync, syncFromRemote } from './data.js';
 export { SUPERADMIN_USERNAME };
 
 const SESSION_KEY = 'juanpmt_session_v1';
-const CLOUD_TIMEOUT_MS = 12000;
+const CLOUD_TIMEOUT_MS = 8000;
 
 /** @type {{ username: string, name: string, role: string, active: boolean } | null} */
 export let currentUser = null;
@@ -113,17 +113,33 @@ function profileFromRecord(username, record) {
 
 /** Read logins via Firestore REST (avoids SDK WebChannel hangs). */
 async function fetchLoginsFromCloud() {
-  const res = await withTimeout(fetch(mainDocRestUrl()), CLOUD_TIMEOUT_MS, 'Database request');
-  if (!res.ok) {
-    const errBody = await res.text().catch(() => '');
-    throw new Error(`Database error (${res.status}). ${errBody.slice(0, 120)}`);
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), CLOUD_TIMEOUT_MS);
+  try {
+    const res = await fetch(mainDocRestUrl(), {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      signal: ctrl.signal,
+      cache: 'no-store'
+    });
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => '');
+      throw new Error(`Database error (${res.status}). ${errBody.slice(0, 120)}`);
+    }
+    const doc = await res.json();
+    const fields = doc.fields || {};
+    const logins = fields.logins ? fromFirestoreValue(fields.logins) : {};
+    const safe = (logins && typeof logins === 'object' && !Array.isArray(logins)) ? logins : {};
+    data.logins = { ...safe };
+    return data.logins;
+  } catch (err) {
+    if (err?.name === 'AbortError') {
+      throw new Error('Database request timed out. Check your network and try again.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
   }
-  const doc = await res.json();
-  const fields = doc.fields || {};
-  const logins = fields.logins ? fromFirestoreValue(fields.logins) : {};
-  const safe = (logins && typeof logins === 'object' && !Array.isArray(logins)) ? logins : {};
-  data.logins = { ...safe };
-  return data.logins;
 }
 
 export function watchAuth(onChange) {

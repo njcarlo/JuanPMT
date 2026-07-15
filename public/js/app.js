@@ -119,29 +119,39 @@ function showApp(user) {
       btn.classList.add('active');
       document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
       document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
-      renderAll();
+      try { renderAll(); } catch (err) { console.error(err); }
     });
 
     document.querySelectorAll('.modal-overlay').forEach(ov => {
       ov.addEventListener('click', e => { if (e.target === ov) ov.classList.remove('open'); });
     });
 
-    document.getElementById('projStatusFilter').addEventListener('change',  projects.render);
-    document.getElementById('taskProjectFilter').addEventListener('change', tasks.render);
-    document.getElementById('taskOwnerFilter').addEventListener('change',   tasks.render);
-    document.getElementById('taskStatusFilter').addEventListener('change',  tasks.render);
-    document.getElementById('txnTypeFilter').addEventListener('change',     finance.render);
-    document.getElementById('txnCategoryFilter').addEventListener('change', finance.render);
-    document.getElementById('txnProjectFilter').addEventListener('change',  finance.render);
-    document.getElementById('leadStatusFilter').addEventListener('change',  leads.render);
-    document.getElementById('leadSourceFilter').addEventListener('change',  leads.render);
-    document.getElementById('leadOwnerFilter').addEventListener('change',   leads.render);
+    document.getElementById('projStatusFilter').addEventListener('change',  () => { try { projects.render(); } catch (e) { console.error(e); } });
+    document.getElementById('taskProjectFilter').addEventListener('change', () => { try { tasks.render(); } catch (e) { console.error(e); } });
+    document.getElementById('taskOwnerFilter').addEventListener('change',   () => { try { tasks.render(); } catch (e) { console.error(e); } });
+    document.getElementById('taskStatusFilter').addEventListener('change',  () => { try { tasks.render(); } catch (e) { console.error(e); } });
+    document.getElementById('txnTypeFilter').addEventListener('change',     () => { try { finance.render(); } catch (e) { console.error(e); } });
+    document.getElementById('txnCategoryFilter').addEventListener('change', () => { try { finance.render(); } catch (e) { console.error(e); } });
+    document.getElementById('txnProjectFilter').addEventListener('change',  () => { try { finance.render(); } catch (e) { console.error(e); } });
+    document.getElementById('leadStatusFilter').addEventListener('change',  () => { try { leads.render(); } catch (e) { console.error(e); } });
+    document.getElementById('leadSourceFilter').addEventListener('change',  () => { try { leads.render(); } catch (e) { console.error(e); } });
+    document.getElementById('leadOwnerFilter').addEventListener('change',   () => { try { leads.render(); } catch (e) { console.error(e); } });
 
-    firestoreUnsub = watchFirestore(renderAll);
+    try {
+      firestoreUnsub = watchFirestore(() => {
+        try { renderAll(); } catch (err) { console.error(err); }
+      });
+    } catch (err) {
+      console.error('watchFirestore failed', err);
+    }
     appReady = true;
   }
 
-  renderAll();
+  try {
+    renderAll();
+  } catch (err) {
+    console.error('renderAll failed', err);
+  }
 }
 
 function showLogin(err) {
@@ -168,20 +178,33 @@ loginForm.addEventListener('submit', async e => {
   const prevLabel = loginSubmitBtn.textContent;
   loginSubmitBtn.disabled = true;
   loginSubmitBtn.textContent = registerMode ? 'Creating…' : 'Signing in…';
+  showLoginError(registerMode ? 'Creating account…' : 'Contacting database…');
+  let user = null;
   try {
-    let user;
     if (registerMode) {
       user = await register(username, password, name);
     } else {
       user = await login(username, password);
     }
-    showApp(user);
   } catch (err) {
     console.error('Login failed', err);
     showLoginError(authErrorMessage(err));
-  } finally {
     loginSubmitBtn.disabled = false;
     loginSubmitBtn.textContent = prevLabel;
+    delete loginSubmitBtn.dataset.busy;
+    return;
+  }
+
+  // Restore button before heavy UI render so it never looks stuck
+  loginSubmitBtn.disabled = false;
+  loginSubmitBtn.textContent = prevLabel;
+  delete loginSubmitBtn.dataset.busy;
+
+  try {
+    showApp(user);
+  } catch (err) {
+    console.error('App render failed', err);
+    showLoginError('Signed in, but the app failed to open: ' + (err?.message || err));
   }
 });
 
