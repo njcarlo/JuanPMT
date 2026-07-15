@@ -1,4 +1,4 @@
-import { DATA_DOC, setDoc, getDoc, onSnapshot } from './firebase-config.js';
+import { DATA_DOC, setDoc, getDoc, onSnapshot } from './firebase-config.js?v=20260715f';
 
 export const STORAGE_KEY = 'juanpmt_data_v2';
 

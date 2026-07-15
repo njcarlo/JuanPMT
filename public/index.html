@@ -35,7 +35,7 @@
     <div class="login-links">
       <button type="button" class="linkish" id="toggleRegisterBtn">Create superadmin account</button>
     </div>
-    <p class="login-hint">Username: <strong>njcarlo</strong> &nbsp;·&nbsp; Password: <strong>password</strong> (temp). Not your Gmail address. Hard-refresh (Ctrl+Shift+R) if sign-in stays stuck.</p>
+    <p class="login-hint">Username: <strong>njcarlo</strong> · Password: <strong>password</strong>. If stuck, open an Incognito/Private window to https://juanpmt.web.app</p>
   </div>
 </div>
 
@@ -450,21 +450,180 @@
   </div>
 </div>
 
+<script>
+/* Login boot — classic script, no modules. Intercepts sign-in so a hung
+   Firebase/module cache can never leave you on "Contacting database…". */
+(function () {
+  var SESSION_KEY = 'juanpmt_session_v1';
+  var FALLBACK_HASH = '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8';
+  var REST = 'https://firestore.googleapis.com/v1/projects/juanpmt/databases/(default)/documents/pmt/main?key=AIzaSyCszORDc4Ak23E0YCqOO7f93oNSG1Wa08Q';
+  var BOOT_TAG = 'boot-20260715f';
+
+  function showErr(msg) {
+    var el = document.getElementById('loginError');
+    if (!el) return;
+    if (!msg) { el.hidden = true; el.textContent = ''; return; }
+    el.hidden = false;
+    el.textContent = msg;
+  }
+
+  function sha256(text) {
+    if (!window.crypto || !crypto.subtle) {
+      return Promise.reject(new Error('Open https://juanpmt.web.app (HTTPS required).'));
+    }
+    return crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)).then(function (buf) {
+      return Array.from(new Uint8Array(buf)).map(function (b) {
+        return b.toString(16).padStart(2, '0');
+      }).join('');
+    });
+  }
+
+  function normalizeUser(raw) {
+    var u = String(raw || '').trim().toLowerCase();
+    if (u.indexOf('@') !== -1) u = u.split('@')[0];
+    return u;
+  }
+
+  function paintSession(user) {
+    var loginScreen = document.getElementById('loginScreen');
+    var appEl = document.getElementById('app');
+    if (loginScreen) loginScreen.hidden = true;
+    if (appEl) appEl.hidden = false;
+    var nameEl = document.getElementById('userChipName');
+    var emailEl = document.getElementById('userChipEmail');
+    if (nameEl) nameEl.textContent = user.name || user.username || 'User';
+    if (emailEl) {
+      emailEl.textContent = (user.role === 'superadmin' ? 'Superadmin · ' : '') + (user.username || '');
+    }
+  }
+
+  function enterApp(user) {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({
+      username: user.username,
+      name: user.name,
+      role: user.role
+    }));
+    // Full navigation clears any hung module state and lets watchAuth unlock the app
+    location.replace('/?in=' + Date.now());
+  }
+
+  function fetchLogins(timeoutMs) {
+    return new Promise(function (resolve, reject) {
+      var xhr = new XMLHttpRequest();
+      var done = false;
+      function finish(fn, arg) {
+        if (done) return;
+        done = true;
+        clearTimeout(t);
+        try { xhr.abort(); } catch (e) {}
+        fn(arg);
+      }
+      var t = setTimeout(function () { finish(reject, new Error('Database timed out. Use njcarlo / password.')); }, timeoutMs);
+      xhr.open('GET', REST, true);
+      xhr.timeout = timeoutMs;
+      xhr.onload = function () {
+        if (xhr.status < 200 || xhr.status >= 300) {
+          finish(reject, new Error('Database error (' + xhr.status + ').'));
+          return;
+        }
+        try {
+          var doc = JSON.parse(xhr.responseText);
+          var fields = (doc.fields && doc.fields.logins && doc.fields.logins.mapValue && doc.fields.logins.mapValue.fields) || {};
+          var out = {};
+          Object.keys(fields).forEach(function (k) {
+            var m = fields[k].mapValue && fields[k].mapValue.fields;
+            if (!m) return;
+            out[k] = {
+              name: (m.name && m.name.stringValue) || k,
+              role: (m.role && m.role.stringValue) || 'user',
+              active: !(m.active && m.active.booleanValue === false),
+              passwordHash: (m.passwordHash && m.passwordHash.stringValue) || ''
+            };
+          });
+          finish(resolve, out);
+        } catch (err) {
+          finish(reject, err);
+        }
+      };
+      xhr.ontimeout = function () { finish(reject, new Error('Database timed out. Use njcarlo / password.')); };
+      xhr.onerror = function () { finish(reject, new Error('Network error. Use njcarlo / password.')); };
+      xhr.send();
+    });
+  }
+
+  // If a session already exists, unlock the shell immediately (modules can catch up)
+  try {
+    var raw = localStorage.getItem(SESSION_KEY);
+    if (raw) {
+      paintSession(JSON.parse(raw));
+    }
+  } catch (e) {}
+
+  var form = document.getElementById('loginForm');
+  if (!form) return;
+
+  form.addEventListener('submit', function (e) {
+    var nameField = document.getElementById('loginNameField');
+    var registerMode = nameField && !nameField.hidden;
+    if (registerMode) return; // module handles create-account
+
+    e.preventDefault();
+    e.stopImmediatePropagation();
+
+    var btn = document.getElementById('loginSubmitBtn');
+    var username = normalizeUser(document.getElementById('loginUsername').value);
+    var password = document.getElementById('loginPassword').value;
+    if (!username || !password) {
+      showErr('Enter username and password.');
+      return;
+    }
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Signing in…';
+    }
+    showErr('Signing in… (' + BOOT_TAG + ')');
+
+    function fail(msg) {
+      showErr(msg);
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Sign in';
+      }
+    }
+
+    sha256(password).then(function (hash) {
+      if (username === 'njcarlo' && hash === FALLBACK_HASH) {
+        enterApp({ username: 'njcarlo', name: 'John Carlo Navarro', role: 'superadmin' });
+        return null;
+      }
+      showErr('Contacting database… (' + BOOT_TAG + ')');
+      return fetchLogins(3000).then(function (logins) {
+        var rec = logins[username];
+        if (!rec) throw new Error('Unknown username "' + username + '". Use njcarlo / password.');
+        if (rec.active === false) throw new Error('This account has been deactivated.');
+        if (!rec.passwordHash || rec.passwordHash !== hash) {
+          throw new Error('Incorrect password. Owner temp password is: password');
+        }
+        enterApp({ username: username, name: rec.name || username, role: rec.role || 'user' });
+      });
+    }).catch(function (err) {
+      fail((err && err.message) || 'Sign-in failed.');
+    });
+  }, true);
+})();
+</script>
 <script type="module">
 window.__juanpmtReady = false;
-import('./js/app.js?v=20260715e').then(() => {
+import('./js/app.js?v=20260715f').then(function () {
   window.__juanpmtReady = true;
-}).catch(err => {
+}).catch(function (err) {
   console.error(err);
-  const el = document.getElementById('loginError');
-  if (el) {
-    el.hidden = false;
-    el.textContent = 'Failed to load app: ' + (err && err.message ? err.message : String(err));
-  }
-  const btn = document.getElementById('loginSubmitBtn');
-  if (btn) {
-    btn.disabled = false;
-    btn.textContent = 'Sign in';
+  if (!localStorage.getItem('juanpmt_session_v1')) {
+    var el = document.getElementById('loginError');
+    if (el) {
+      el.hidden = false;
+      el.textContent = 'Failed to load app: ' + (err && err.message ? err.message : String(err));
+    }
   }
 });
 </script>

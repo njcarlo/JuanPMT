@@ -1,5 +1,5 @@
-import { SUPERADMIN_USERNAME, normalizeUsername, mainDocRestUrl } from './firebase-config.js';
-import { data, saveAsync, syncFromRemote } from './data.js';
+import { SUPERADMIN_USERNAME, normalizeUsername, mainDocRestUrl } from './firebase-config.js?v=20260715f';
+import { data, saveAsync, syncFromRemote } from './data.js?v=20260715f';
 
 export { SUPERADMIN_USERNAME };
 
