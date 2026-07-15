@@ -4,6 +4,18 @@ import { fmtDate, slugStatus, todayStr, projectName, memberName } from '../helpe
 let _renderAll, _closeModal;
 export function init(renderAll, closeModal) { _renderAll = renderAll; _closeModal = closeModal; }
 
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function escapeAttr(s) {
+  return escapeHtml(s).replace(/\n/g, ' ');
+}
+
 function populateFilterOptions() {
   const projSel = document.getElementById('taskProjectFilter');
   const ownerSel = document.getElementById('taskOwnerFilter');
@@ -23,8 +35,13 @@ export function render() {
     .sort((a, b) => a.due.localeCompare(b.due));
   const rows = list.map(t => {
     const overdueRow = t.status !== 'Done' && t.due < todayStr();
+    const details = (t.details || '').trim();
+    const detailsPreview = details
+      ? `<div style="color:var(--text-muted);font-size:11.5px;margin-top:2px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeAttr(details)}">${escapeHtml(details)}</div>`
+      : '';
     return `<tr>
-      <td>${t.name}</td><td>${projectName(t.project)}</td><td>${memberName(t.owner)}</td>
+      <td><strong>${escapeHtml(t.name)}</strong>${detailsPreview}</td>
+      <td>${projectName(t.project)}</td><td>${memberName(t.owner)}</td>
       <td style="color:${overdueRow ? 'var(--red)' : 'inherit'};font-weight:${overdueRow ? 700 : 400}">${fmtDate(t.due)}</td>
       <td><span class="badge status-${slugStatus(t.status)}">${t.status}</span></td>
       <td><span class="badge priority-${slugStatus(t.priority)}">${t.priority}</span></td>
@@ -44,6 +61,7 @@ export function openModal(id) {
   document.getElementById('taskModalTitle').textContent = t ? 'Edit Task' : 'New Task';
   document.getElementById('taskId').value = id || '';
   document.getElementById('taskName').value = t ? t.name : '';
+  document.getElementById('taskDetails').value = t ? (t.details || '') : '';
   document.getElementById('taskProject').value = t ? t.project : (data.projects[0]?.id || '');
   document.getElementById('taskOwner').value = t ? t.owner : (data.team[0]?.id || '');
   document.getElementById('taskDue').value = t ? t.due : todayStr();
@@ -62,6 +80,7 @@ export function saveModal() {
   if (!data.team.length) { alert('Add a team member first.'); return; }
   const obj = {
     id: id || uid('k'), name,
+    details: document.getElementById('taskDetails').value.trim(),
     project: document.getElementById('taskProject').value,
     owner: document.getElementById('taskOwner').value,
     due: document.getElementById('taskDue').value || todayStr(),

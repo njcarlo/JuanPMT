@@ -164,7 +164,7 @@ Defaults / migration live in `data.js` (`emptyData`, `migrate`). Protected expen
 | Entity | Key fields |
 |--------|------------|
 | **project** | `id`, `name`, `client`, `start`, `end`, `status`, `priority`, `budget`, `spent` |
-| **task** | `id`, `name`, `project`, `owner`, `due`, `status`, `priority`, `hours` |
+| **task** | `id`, `name`, `details?`, `project`, `owner`, `due`, `status`, `priority`, `hours` |
 | **team member** | `id`, `name`, `role`, `capacity`, `salary` |
 | **transaction** | `id`, `type` (`In`\|`Out`), `category`, `amount`, `date`, `project?`, `member?`, `note`, (`partnerId` for dividends) |
 | **lead** | `id`, name/contact/email/phone, `status`, `source`, `value`, `assignedTo`, `notes` |
