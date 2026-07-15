@@ -35,7 +35,7 @@
     <div class="login-links">
       <button type="button" class="linkish" id="toggleRegisterBtn">Create superadmin account</button>
     </div>
-    <p class="login-hint">Username: <strong>njcarlo</strong> &nbsp;·&nbsp; Password: the one you set (reset to <strong>password</strong> if needed). Not your Gmail address.</p>
+    <p class="login-hint">Username: <strong>njcarlo</strong> &nbsp;·&nbsp; Password: <strong>password</strong> (temp). Not your Gmail address. Hard-refresh (Ctrl+Shift+R) if sign-in stays stuck.</p>
   </div>
 </div>
 
@@ -450,32 +450,10 @@
   </div>
 </div>
 
-<script>
-// Immediate feedback even if the app module fails to load
-document.getElementById('loginForm')?.addEventListener('submit', function (e) {
-  e.preventDefault();
-  const err = document.getElementById('loginError');
-  const btn = document.getElementById('loginSubmitBtn');
-  if (btn && !btn.dataset.busy) {
-    btn.dataset.busy = '1';
-    btn.textContent = 'Signing in…';
-  }
-  if (err && err.hidden && !window.__juanpmtReady) {
-    // Module not ready yet — show status; app.js will take over when loaded
-    err.hidden = false;
-    err.textContent = 'Loading app…';
-  }
-}, true);
-</script>
 <script type="module">
 window.__juanpmtReady = false;
-import('./js/app.js?v=20260715c').then(() => {
+import('./js/app.js?v=20260715e').then(() => {
   window.__juanpmtReady = true;
-  const err = document.getElementById('loginError');
-  if (err && err.textContent === 'Loading app…') {
-    err.hidden = true;
-    err.textContent = '';
-  }
 }).catch(err => {
   console.error(err);
   const el = document.getElementById('loginError');
@@ -487,7 +465,6 @@ import('./js/app.js?v=20260715c').then(() => {
   if (btn) {
     btn.disabled = false;
     btn.textContent = 'Sign in';
-    delete btn.dataset.busy;
   }
 });
 </script>

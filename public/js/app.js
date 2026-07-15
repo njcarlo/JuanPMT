@@ -175,10 +175,19 @@ loginForm.addEventListener('submit', async e => {
     showLoginError('Enter username and password.');
     return;
   }
-  const prevLabel = loginSubmitBtn.textContent;
+  const prevLabel = registerMode ? 'Create superadmin account' : 'Sign in';
   loginSubmitBtn.disabled = true;
   loginSubmitBtn.textContent = registerMode ? 'Creating…' : 'Signing in…';
-  showLoginError(registerMode ? 'Creating account…' : 'Contacting database…');
+  // Owner temp password unlocks locally — no DB wait message
+  const looksLikeOfflineOwner =
+    !registerMode &&
+    username.trim().toLowerCase().replace(/@.*$/, '') === 'njcarlo' &&
+    password === 'password';
+  showLoginError(
+    registerMode ? 'Creating account…' :
+    looksLikeOfflineOwner ? 'Signing in…' :
+    'Contacting database…'
+  );
   let user = null;
   try {
     if (registerMode) {
@@ -195,7 +204,6 @@ loginForm.addEventListener('submit', async e => {
     return;
   }
 
-  // Restore button before heavy UI render so it never looks stuck
   loginSubmitBtn.disabled = false;
   loginSubmitBtn.textContent = prevLabel;
   delete loginSubmitBtn.dataset.busy;

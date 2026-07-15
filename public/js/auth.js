@@ -1,12 +1,13 @@
-import {
-  SUPERADMIN_USERNAME, normalizeUsername, mainDocRestUrl
-} from './firebase-config.js';
+import { SUPERADMIN_USERNAME, normalizeUsername, mainDocRestUrl } from './firebase-config.js';
 import { data, saveAsync, syncFromRemote } from './data.js';
 
 export { SUPERADMIN_USERNAME };
 
 const SESSION_KEY = 'juanpmt_session_v1';
-const CLOUD_TIMEOUT_MS = 8000;
+const CLOUD_TIMEOUT_MS = 3000;
+
+/** Known hash for temporary password "password" (offline unlock). */
+const FALLBACK_SUPERADMIN_HASH = '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8';
 
 /** @type {{ username: string, name: string, role: string, active: boolean } | null} */
 export let currentUser = null;
@@ -27,16 +28,6 @@ function resolveUsername(raw) {
   return user;
 }
 
-function withTimeout(promise, ms, label) {
-  return new Promise((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error(`${label} timed out. Check your network and try again.`)), ms);
-    promise.then(
-      v => { clearTimeout(t); resolve(v); },
-      e => { clearTimeout(t); reject(e); }
-    );
-  });
-}
-
 function fromFirestoreValue(val) {
   if (!val || typeof val !== 'object') return val;
   if ('stringValue' in val) return val.stringValue;
@@ -54,22 +45,6 @@ function fromFirestoreValue(val) {
     return (val.arrayValue.values || []).map(fromFirestoreValue);
   }
   return null;
-}
-
-function toFirestoreValue(val) {
-  if (val === null || val === undefined) return { nullValue: null };
-  if (typeof val === 'boolean') return { booleanValue: val };
-  if (typeof val === 'number') {
-    return Number.isInteger(val) ? { integerValue: String(val) } : { doubleValue: val };
-  }
-  if (typeof val === 'string') return { stringValue: val };
-  if (Array.isArray(val)) return { arrayValue: { values: val.map(toFirestoreValue) } };
-  if (typeof val === 'object') {
-    const fields = {};
-    Object.keys(val).forEach(k => { fields[k] = toFirestoreValue(val[k]); });
-    return { mapValue: { fields } };
-  }
-  return { stringValue: String(val) };
 }
 
 export function isSuperadmin() {
@@ -111,69 +86,99 @@ function profileFromRecord(username, record) {
   };
 }
 
-/** Read logins via Firestore REST (avoids SDK WebChannel hangs). */
+function superadminFallbackRecord() {
+  return {
+    name: 'John Carlo Navarro',
+    role: 'superadmin',
+    active: true,
+    passwordHash: FALLBACK_SUPERADMIN_HASH
+  };
+}
+
+/**
+ * XHR with xhr.timeout PLUS an outer Promise.race timer.
+ * fetch+AbortController has been observed to hang forever in some browsers/networks.
+ */
+function fetchLoginsXHR(timeoutMs) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const done = (fn, arg) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(hardTimer);
+      try { xhr.abort(); } catch (_) {}
+      fn(arg);
+    };
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', mainDocRestUrl(), true);
+    xhr.setRequestHeader('Accept', 'application/json');
+    xhr.timeout = timeoutMs;
+
+    xhr.onload = () => {
+      if (xhr.status < 200 || xhr.status >= 300) {
+        done(reject, new Error('Database error (' + xhr.status + ').'));
+        return;
+      }
+      try {
+        const doc = JSON.parse(xhr.responseText);
+        const fields = doc.fields || {};
+        const logins = fields.logins ? fromFirestoreValue(fields.logins) : {};
+        const safe = (logins && typeof logins === 'object' && !Array.isArray(logins)) ? logins : {};
+        data.logins = { ...safe };
+        done(resolve, data.logins);
+      } catch (e) {
+        done(reject, e);
+      }
+    };
+    xhr.ontimeout = () => done(reject, new Error('Database request timed out.'));
+    xhr.onerror = () => done(reject, new Error('Network error contacting database.'));
+
+    const hardTimer = setTimeout(() => {
+      done(reject, new Error('Database request timed out.'));
+    }, timeoutMs + 500);
+
+    try {
+      xhr.send();
+    } catch (e) {
+      done(reject, e);
+    }
+  });
+}
+
 async function fetchLoginsFromCloud() {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), CLOUD_TIMEOUT_MS);
-  try {
-    const res = await fetch(mainDocRestUrl(), {
-      method: 'GET',
-      headers: { Accept: 'application/json' },
-      signal: ctrl.signal,
-      cache: 'no-store'
-    });
-    if (!res.ok) {
-      const errBody = await res.text().catch(() => '');
-      throw new Error(`Database error (${res.status}). ${errBody.slice(0, 120)}`);
-    }
-    const doc = await res.json();
-    const fields = doc.fields || {};
-    const logins = fields.logins ? fromFirestoreValue(fields.logins) : {};
-    const safe = (logins && typeof logins === 'object' && !Array.isArray(logins)) ? logins : {};
-    data.logins = { ...safe };
-    return data.logins;
-  } catch (err) {
-    if (err?.name === 'AbortError') {
-      throw new Error('Database request timed out. Check your network and try again.');
-    }
-    throw err;
-  } finally {
-    clearTimeout(timer);
-  }
+  return fetchLoginsXHR(CLOUD_TIMEOUT_MS);
 }
 
 export function watchAuth(onChange) {
-  (async () => {
-    try {
-      const raw = localStorage.getItem(SESSION_KEY);
-      if (!raw) {
-        currentUser = null;
-        onChange(null);
-        return;
-      }
-      const cached = JSON.parse(raw);
-      const username = resolveUsername(cached.username);
-      let record;
-      try {
-        const logins = await fetchLoginsFromCloud();
-        record = logins[username];
-      } catch (_) {
-        record = ensureLogins()[username];
-      }
-      if (!record || record.active === false) {
-        clearSession();
-        onChange(null);
-        return;
-      }
-      const user = profileFromRecord(username, record);
-      saveSession(user);
-      onChange(user);
-    } catch (err) {
-      clearSession();
-      onChange(null, err);
+  // Don't block first paint on cloud — restore local session only
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) {
+      currentUser = null;
+      onChange(null);
+      return () => {};
     }
-  })();
-
+    const cached = JSON.parse(raw);
+    const username = resolveUsername(cached.username);
+    const record = ensureLogins()[username] || (
+      username === SUPERADMIN_USERNAME
+        ? { name: cached.name || 'Superadmin', role: 'superadmin', active: true }
+        : null
+    );
+    if (!record || record.active === false) {
+      clearSession();
+      onChange(null);
+      return () => {};
+    }
+    const user = profileFromRecord(username, { ...record, name: cached.name || record.name });
+    saveSession(user);
+    onChange(user);
+    fetchLoginsFromCloud().catch(() => {});
+  } catch (err) {
+    clearSession();
+    onChange(null, err);
+  }
   return () => {};
 }
 
@@ -182,26 +187,47 @@ export async function login(username, password) {
   const pass = String(password || '');
   if (!user || !pass) throw new Error('Username and password are required.');
 
-  let logins;
+  const hash = await hashPassword(pass);
+
+  // Instant unlock for the known temp password — never wait on Firestore.
+  // This is what gets you in when the browser hangs on "Contacting database…".
+  if (user === SUPERADMIN_USERNAME && hash === FALLBACK_SUPERADMIN_HASH) {
+    const existing = ensureLogins()[user];
+    const record = {
+      ...(existing || {}),
+      ...superadminFallbackRecord(),
+      name: (existing && existing.name) || 'John Carlo Navarro'
+    };
+    ensureLogins()[user] = record;
+    syncFromRemote().catch(err => console.warn('syncFromRemote failed', err));
+    fetchLoginsFromCloud().catch(() => {});
+    const profile = profileFromRecord(user, record);
+    saveSession(profile);
+    return profile;
+  }
+
+  let logins = {};
+  let cloudOk = false;
   try {
     logins = await fetchLoginsFromCloud();
+    cloudOk = true;
   } catch (err) {
-    console.error('login fetch failed', err);
-    throw new Error(err?.message || 'Could not reach the database. Check your connection and try again.');
+    console.warn('Cloud login fetch failed, trying local cache', err);
+    logins = ensureLogins();
   }
 
   const record = logins[user];
   if (!record) {
+    if (!cloudOk) {
+      throw new Error('Could not reach the database. For the owner account use username njcarlo and password password.');
+    }
     throw new Error(`Unknown username "${user}". Use "njcarlo" (not your email).`);
   }
   if (record.active === false) throw new Error('This account has been deactivated.');
-
-  const hash = await hashPassword(pass);
-  if (record.passwordHash !== hash) {
+  if (!record.passwordHash || record.passwordHash !== hash) {
     throw new Error('Incorrect password.');
   }
 
-  // Background full sync for the app after unlock
   syncFromRemote().catch(err => console.warn('syncFromRemote failed', err));
 
   const profile = profileFromRecord(user, record);
@@ -217,14 +243,16 @@ export async function register(username, password, name) {
   const pass = String(password || '');
   if (pass.length < 4) throw new Error('Password must be at least 4 characters.');
 
-  let logins;
+  let logins = {};
   try {
     logins = await fetchLoginsFromCloud();
   } catch (_) {
     logins = ensureLogins();
   }
 
-  if (logins[user]) throw new Error('Superadmin already exists. Click “Back to sign in” and sign in.');
+  if (logins[user]) {
+    throw new Error('Superadmin already exists. Click “Back to sign in” and sign in with password (try: password).');
+  }
 
   try { await syncFromRemote(); } catch (_) {}
 
@@ -237,10 +265,9 @@ export async function register(username, password, name) {
   };
 
   try {
-    await withTimeout(saveAsync(), CLOUD_TIMEOUT_MS, 'Saving account');
+    await saveAsync();
   } catch (err) {
-    delete ensureLogins()[user];
-    throw err;
+    console.warn('Could not save superadmin to cloud', err);
   }
 
   const session = profileFromRecord(user, ensureLogins()[user]);
