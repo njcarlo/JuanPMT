@@ -30,7 +30,7 @@ function migrate(d) {
   d.transactions = d.transactions || [];
   d.leads        = d.leads        || [];
   d.partners     = d.partners     || [];
-  d.logins       = d.logins && typeof d.logins === 'object' ? d.logins : {};
+  d.logins = (d.logins && typeof d.logins === 'object' && !Array.isArray(d.logins)) ? d.logins : {};
   if (!Array.isArray(d.outCategories) || !d.outCategories.length) {
     d.outCategories = [...DEFAULT_OUT_CATEGORIES];
   }

@@ -1,4 +1,4 @@
-import { SUPERADMIN_USERNAME, normalizeUsername } from './firebase-config.js';
+import { SUPERADMIN_USERNAME, normalizeUsername, DATA_DOC, getDoc } from './firebase-config.js';
 import { data, saveAsync, syncFromRemote } from './data.js';
 
 export { SUPERADMIN_USERNAME };
@@ -9,8 +9,20 @@ const SESSION_KEY = 'juanpmt_session_v1';
 export let currentUser = null;
 
 function ensureLogins() {
-  if (!data.logins || typeof data.logins !== 'object') data.logins = {};
+  if (!data.logins || typeof data.logins !== 'object' || Array.isArray(data.logins)) {
+    data.logins = {};
+  }
   return data.logins;
+}
+
+/** Map common mistakes (email) to the real username. */
+function resolveUsername(raw) {
+  let user = normalizeUsername(raw);
+  if (user.includes('@')) {
+    const local = user.split('@')[0];
+    if (local === SUPERADMIN_USERNAME) return SUPERADMIN_USERNAME;
+  }
+  return user;
 }
 
 export function isSuperadmin() {
@@ -52,8 +64,21 @@ function profileFromRecord(username, record) {
   };
 }
 
+/** Always read logins from Firestore for auth checks (ignore stale localStorage). */
+async function fetchLoginsFromCloud() {
+  const snap = await getDoc(DATA_DOC);
+  if (!snap.exists()) return {};
+  const remote = snap.data() || {};
+  const logins = remote.logins && typeof remote.logins === 'object' && !Array.isArray(remote.logins)
+    ? remote.logins
+    : {};
+  // Keep in-memory copy in sync for the rest of the app
+  data.logins = { ...logins };
+  return data.logins;
+}
+
 /**
- * Restore session from localStorage and re-validate against stored logins.
+ * Restore session from localStorage and re-validate against cloud logins.
  */
 export function watchAuth(onChange) {
   (async () => {
@@ -65,8 +90,14 @@ export function watchAuth(onChange) {
         return;
       }
       const cached = JSON.parse(raw);
-      const username = normalizeUsername(cached.username);
-      const record = ensureLogins()[username];
+      const username = resolveUsername(cached.username);
+      let record;
+      try {
+        const logins = await fetchLoginsFromCloud();
+        record = logins[username];
+      } catch (_) {
+        record = ensureLogins()[username];
+      }
       if (!record || record.active === false) {
         clearSession();
         onChange(null);
@@ -85,17 +116,28 @@ export function watchAuth(onChange) {
 }
 
 export async function login(username, password) {
-  const user = normalizeUsername(username);
-  if (!user || !password) throw new Error('Username and password are required.');
+  const user = resolveUsername(username);
+  const pass = String(password || '');
+  if (!user || !pass) throw new Error('Username and password are required.');
 
-  try { await syncFromRemote(); } catch (_) { /* use local copy if offline */ }
+  let logins;
+  try {
+    logins = await fetchLoginsFromCloud();
+    try { await syncFromRemote(); } catch (_) {}
+  } catch (err) {
+    throw new Error('Could not reach the database. Check your connection and try again.');
+  }
 
-  const record = ensureLogins()[user];
-  if (!record) throw new Error('Incorrect username or password.');
+  const record = logins[user];
+  if (!record) {
+    throw new Error(`Unknown username "${user}". Use "njcarlo" (not your email).`);
+  }
   if (record.active === false) throw new Error('This account has been deactivated.');
 
-  const hash = await hashPassword(password);
-  if (record.passwordHash !== hash) throw new Error('Incorrect username or password.');
+  const hash = await hashPassword(pass);
+  if (record.passwordHash !== hash) {
+    throw new Error('Incorrect password.');
+  }
 
   const profile = profileFromRecord(user, record);
   saveSession(profile);
@@ -104,33 +146,39 @@ export async function login(username, password) {
 
 /** First-time setup: create the superadmin account inside pmt/main.logins. */
 export async function register(username, password, name) {
-  const user = normalizeUsername(username);
+  const user = resolveUsername(username);
   if (user !== SUPERADMIN_USERNAME) {
     throw new Error(`First account must be username "${SUPERADMIN_USERNAME}". Other users are added in Settings.`);
   }
-  if (!password || password.length < 4) throw new Error('Password must be at least 4 characters.');
+  const pass = String(password || '');
+  if (pass.length < 4) throw new Error('Password must be at least 4 characters.');
 
-  try { await syncFromRemote(); } catch (_) { /* first install may have no doc yet */ }
+  let logins;
+  try {
+    logins = await fetchLoginsFromCloud();
+    try { await syncFromRemote(); } catch (_) {}
+  } catch (_) {
+    logins = ensureLogins();
+  }
 
-  const logins = ensureLogins();
-  if (logins[user]) throw new Error('Superadmin already exists. Sign in instead.');
+  if (logins[user]) throw new Error('Superadmin already exists. Click “Back to sign in” and sign in.');
 
-  logins[user] = {
+  ensureLogins()[user] = {
     name: (name || '').trim() || 'Superadmin',
     role: 'superadmin',
     active: true,
-    passwordHash: await hashPassword(password),
+    passwordHash: await hashPassword(pass),
     createdAt: new Date().toISOString()
   };
 
   try {
     await saveAsync();
   } catch (err) {
-    delete logins[user];
+    delete ensureLogins()[user];
     throw err;
   }
 
-  const session = profileFromRecord(user, logins[user]);
+  const session = profileFromRecord(user, ensureLogins()[user]);
   saveSession(session);
   return session;
 }
