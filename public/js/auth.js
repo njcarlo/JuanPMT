@@ -4,6 +4,7 @@ import { data, saveAsync, syncFromRemote } from './data.js';
 export { SUPERADMIN_USERNAME };
 
 const SESSION_KEY = 'juanpmt_session_v1';
+const CLOUD_TIMEOUT_MS = 12000;
 
 /** @type {{ username: string, name: string, role: string, active: boolean } | null} */
 export let currentUser = null;
@@ -23,6 +24,16 @@ function resolveUsername(raw) {
     if (local === SUPERADMIN_USERNAME) return SUPERADMIN_USERNAME;
   }
   return user;
+}
+
+function withTimeout(promise, ms, label) {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`${label} timed out. Check your network and try again.`)), ms);
+    promise.then(
+      v => { clearTimeout(t); resolve(v); },
+      e => { clearTimeout(t); reject(e); }
+    );
+  });
 }
 
 export function isSuperadmin() {
@@ -66,13 +77,12 @@ function profileFromRecord(username, record) {
 
 /** Always read logins from Firestore for auth checks (ignore stale localStorage). */
 async function fetchLoginsFromCloud() {
-  const snap = await getDoc(DATA_DOC);
+  const snap = await withTimeout(getDoc(DATA_DOC), CLOUD_TIMEOUT_MS, 'Database request');
   if (!snap.exists()) return {};
   const remote = snap.data() || {};
   const logins = remote.logins && typeof remote.logins === 'object' && !Array.isArray(remote.logins)
     ? remote.logins
     : {};
-  // Keep in-memory copy in sync for the rest of the app
   data.logins = { ...logins };
   return data.logins;
 }
@@ -123,9 +133,9 @@ export async function login(username, password) {
   let logins;
   try {
     logins = await fetchLoginsFromCloud();
-    try { await syncFromRemote(); } catch (_) {}
   } catch (err) {
-    throw new Error('Could not reach the database. Check your connection and try again.');
+    console.error('login fetch failed', err);
+    throw new Error(err?.message || 'Could not reach the database. Check your connection and try again.');
   }
 
   const record = logins[user];
@@ -138,6 +148,9 @@ export async function login(username, password) {
   if (record.passwordHash !== hash) {
     throw new Error('Incorrect password.');
   }
+
+  // Full data sync can happen after UI unlocks
+  syncFromRemote().catch(() => {});
 
   const profile = profileFromRecord(user, record);
   saveSession(profile);
@@ -156,12 +169,14 @@ export async function register(username, password, name) {
   let logins;
   try {
     logins = await fetchLoginsFromCloud();
-    try { await syncFromRemote(); } catch (_) {}
   } catch (_) {
     logins = ensureLogins();
   }
 
   if (logins[user]) throw new Error('Superadmin already exists. Click “Back to sign in” and sign in.');
+
+  // Pull full remote doc before write so we don't wipe projects/tasks
+  try { await syncFromRemote(); } catch (_) {}
 
   ensureLogins()[user] = {
     name: (name || '').trim() || 'Superadmin',
@@ -172,7 +187,7 @@ export async function register(username, password, name) {
   };
 
   try {
-    await saveAsync();
+    await withTimeout(saveAsync(), CLOUD_TIMEOUT_MS, 'Saving account');
   } catch (err) {
     delete ensureLogins()[user];
     throw err;
@@ -188,6 +203,9 @@ export async function logout() {
 }
 
 export async function listUsers() {
+  try {
+    await fetchLoginsFromCloud();
+  } catch (_) {}
   const logins = ensureLogins();
   return Object.keys(logins)
     .map(username => {
@@ -218,6 +236,7 @@ export async function createAppUser({ username, password, name }) {
   if (user === SUPERADMIN_USERNAME) throw new Error('That username is reserved for the superadmin.');
 
   try { await syncFromRemote(); } catch (_) {}
+  try { await fetchLoginsFromCloud(); } catch (_) {}
 
   const logins = ensureLogins();
   if (logins[user]) throw new Error('That username already exists.');
@@ -246,6 +265,7 @@ export async function setUserActive(username, active) {
   const user = normalizeUsername(username);
   if (user === currentUser?.username) throw new Error('You cannot deactivate yourself.');
   if (user === SUPERADMIN_USERNAME) throw new Error('Cannot deactivate the superadmin.');
+  try { await syncFromRemote(); } catch (_) {}
   const logins = ensureLogins();
   if (!logins[user]) throw new Error('User not found.');
   logins[user].active = !!active;
@@ -258,6 +278,7 @@ export async function removeUser(username) {
   const user = normalizeUsername(username);
   if (user === currentUser?.username) throw new Error('You cannot remove yourself.');
   if (user === SUPERADMIN_USERNAME) throw new Error('Cannot remove the superadmin.');
+  try { await syncFromRemote(); } catch (_) {}
   const logins = ensureLogins();
   if (!logins[user]) throw new Error('User not found.');
   delete logins[user];
@@ -272,6 +293,9 @@ export function authErrorMessage(err) {
   }
   if (/secure browser|crypto\.subtle/i.test(msg)) {
     return 'Open the site over HTTPS (e.g. https://juanpmt.web.app), then try again.';
+  }
+  if (/timed out/i.test(msg)) {
+    return msg;
   }
   return err?.message || 'Something went wrong.';
 }

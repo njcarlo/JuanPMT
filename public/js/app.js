@@ -160,7 +160,9 @@ loginForm.addEventListener('submit', async e => {
   const username = document.getElementById('loginUsername').value.trim();
   const password = document.getElementById('loginPassword').value;
   const name = document.getElementById('loginName').value.trim();
+  const prevLabel = loginSubmitBtn.textContent;
   loginSubmitBtn.disabled = true;
+  loginSubmitBtn.textContent = registerMode ? 'Creating…' : 'Signing in…';
   try {
     let user;
     if (registerMode) {
@@ -170,9 +172,11 @@ loginForm.addEventListener('submit', async e => {
     }
     showApp(user);
   } catch (err) {
+    console.error('Login failed', err);
     showLoginError(authErrorMessage(err));
   } finally {
     loginSubmitBtn.disabled = false;
+    loginSubmitBtn.textContent = prevLabel;
   }
 });
 

@@ -1,5 +1,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, doc, setDoc, getDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import {
+  initializeFirestore, doc, setDoc, getDoc, onSnapshot
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyCszORDc4Ak23E0YCqOO7f93oNSG1Wa08Q',
@@ -14,7 +16,11 @@ const firebaseConfig = {
 export const SUPERADMIN_USERNAME = 'njcarlo';
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+
+// Long polling avoids getDoc hanging forever on some browsers/networks
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true
+});
 
 export { doc, setDoc, getDoc, onSnapshot };
 export const DATA_DOC = doc(db, 'pmt', 'main');
