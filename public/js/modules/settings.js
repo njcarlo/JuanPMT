@@ -5,7 +5,7 @@ import {
 } from '../data.js';
 import {
   isSuperadmin, listUsers, createAppUser, setUserActive, removeUser,
-  authErrorMessage, SUPERADMIN_EMAIL, currentUser
+  authErrorMessage, SUPERADMIN_USERNAME, currentUser
 } from '../auth.js';
 
 let _renderAll;
@@ -21,7 +21,7 @@ export function init(renderAll) {
       addCategory(id === 'newOutCategory' ? 'out' : 'in');
     });
   });
-  ['newUserName', 'newUserEmail', 'newUserPassword'].forEach(id => {
+  ['newUserName', 'newUserUsername', 'newUserPassword'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
     el.addEventListener('keydown', e => {
@@ -97,8 +97,8 @@ async function renderUsers() {
       return;
     }
     const rows = users.map(u => {
-      const isSA = u.role === 'superadmin' || String(u.email || '').toLowerCase() === SUPERADMIN_EMAIL;
-      const isSelf = currentUser && u.uid === currentUser.uid;
+      const isSA = u.role === 'superadmin' || u.username === SUPERADMIN_USERNAME;
+      const isSelf = currentUser && u.username === currentUser.username;
       const active = u.active !== false;
       const roleBadge = isSA
         ? `<span class="badge" style="background:var(--accent-light);color:var(--accent)">Superadmin</span>`
@@ -110,10 +110,10 @@ async function renderUsers() {
       let actions = '';
       if (!isSA && !isSelf) {
         actions = active
-          ? `<button class="btn small secondary" onclick="toggleUserActive('${u.uid}', false)">Deactivate</button>
-             <button class="btn small danger" onclick="deleteUser('${u.uid}')">Remove</button>`
-          : `<button class="btn small secondary" onclick="toggleUserActive('${u.uid}', true)">Reactivate</button>
-             <button class="btn small danger" onclick="deleteUser('${u.uid}')">Remove</button>`;
+          ? `<button class="btn small secondary" onclick="toggleUserActive('${u.username}', false)">Deactivate</button>
+             <button class="btn small danger" onclick="deleteUser('${u.username}')">Remove</button>`
+          : `<button class="btn small secondary" onclick="toggleUserActive('${u.username}', true)">Reactivate</button>
+             <button class="btn small danger" onclick="deleteUser('${u.username}')">Remove</button>`;
       } else if (isSA) {
         actions = `<span style="color:var(--text-muted);font-size:12px">Protected</span>`;
       }
@@ -121,7 +121,7 @@ async function renderUsers() {
       return `<tr>
         <td>
           <strong>${escapeHtml(u.name || '—')}</strong>
-          <div style="color:var(--text-muted);font-size:11.5px">${escapeHtml(u.email || '')}</div>
+          <div style="color:var(--text-muted);font-size:11.5px">@${escapeHtml(u.username || '')}</div>
         </td>
         <td>${roleBadge}</td>
         <td>${statusBadge}</td>
@@ -217,35 +217,35 @@ export function deleteCategory(kind, index) {
 export async function addUser() {
   if (!isSuperadmin()) { alert('Only the superadmin can add users.'); return; }
   const name = document.getElementById('newUserName').value.trim();
-  const email = document.getElementById('newUserEmail').value.trim();
+  const username = document.getElementById('newUserUsername').value.trim();
   const password = document.getElementById('newUserPassword').value;
-  if (!email || !password) { alert('Email and temporary password are required.'); return; }
+  if (!username || !password) { alert('Username and password are required.'); return; }
 
   try {
-    await createAppUser({ email, password, name });
+    await createAppUser({ username, password, name });
     document.getElementById('newUserName').value = '';
-    document.getElementById('newUserEmail').value = '';
+    document.getElementById('newUserUsername').value = '';
     document.getElementById('newUserPassword').value = '';
     await renderUsers();
-    alert(`User created. Share the email and temporary password with them so they can sign in.`);
+    alert('User created. They can sign in with that username and password.');
   } catch (err) {
     alert(authErrorMessage(err));
   }
 }
 
-export async function toggleUserActive(uid, active) {
+export async function toggleUserActive(username, active) {
   try {
-    await setUserActive(uid, active);
+    await setUserActive(username, active);
     await renderUsers();
   } catch (err) {
     alert(authErrorMessage(err));
   }
 }
 
-export async function deleteUser(uid) {
+export async function deleteUser(username) {
   if (!confirm('Remove this user? They will no longer be able to sign in to JuanPMT.')) return;
   try {
-    await removeUser(uid);
+    await removeUser(username);
     await renderUsers();
   } catch (err) {
     alert(authErrorMessage(err));

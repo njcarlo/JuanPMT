@@ -19,12 +19,12 @@
     <div id="loginError" class="login-error" hidden></div>
     <form id="loginForm" autocomplete="on">
       <div class="field">
-        <label for="loginEmail">Email</label>
-        <input type="email" id="loginEmail" required autocomplete="username" placeholder="you@example.com">
+        <label for="loginUsername">Username</label>
+        <input type="text" id="loginUsername" required autocomplete="username" placeholder="username">
       </div>
       <div class="field">
         <label for="loginPassword">Password</label>
-        <input type="password" id="loginPassword" required autocomplete="current-password" minlength="6" placeholder="••••••••">
+        <input type="password" id="loginPassword" required autocomplete="current-password" minlength="4" placeholder="••••••••">
       </div>
       <div class="field" id="loginNameField" hidden>
         <label for="loginName">Display name</label>
@@ -34,9 +34,8 @@
     </form>
     <div class="login-links">
       <button type="button" class="linkish" id="toggleRegisterBtn">Create superadmin account</button>
-      <button type="button" class="linkish" id="forgotPasswordBtn">Forgot password?</button>
     </div>
-    <p class="login-hint">Access is invite-only. Ask your superadmin to add you in Settings → Users.</p>
+    <p class="login-hint">Ask your superadmin to add you in Settings → Users. First setup: username <strong>njcarlo</strong>.</p>
   </div>
 </div>
 
@@ -206,13 +205,13 @@
       <h2>Users</h2>
       <p style="margin:0 0 12px;color:var(--text-muted);font-size:13px;line-height:1.45">
         Add people who can sign in. Only the superadmin can manage users.
-        New users get an email and temporary password you set here.
+        Accounts are stored in Firestore (<code>appUsers</code>) with a username and password.
       </p>
       <div class="toolbar" style="margin-bottom:12px">
         <div class="filters" style="flex:1;flex-wrap:wrap">
-          <input type="text" id="newUserName" placeholder="Name" style="min-width:140px">
-          <input type="email" id="newUserEmail" placeholder="Email" style="min-width:180px">
-          <input type="password" id="newUserPassword" placeholder="Temp password" minlength="6" style="min-width:140px">
+          <input type="text" id="newUserName" placeholder="Display name" style="min-width:140px">
+          <input type="text" id="newUserUsername" placeholder="Username" style="min-width:140px" autocomplete="off">
+          <input type="password" id="newUserPassword" placeholder="Password" minlength="4" style="min-width:140px" autocomplete="new-password">
         </div>
         <button class="btn" onclick="addUser()">+ Add user</button>
       </div>

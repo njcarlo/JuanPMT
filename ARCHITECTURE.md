@@ -140,7 +140,8 @@ Each tab module exports roughly:
 | Path | Purpose |
 |------|---------|
 | `pmt/main` | Entire app state as one JSON document |
-| `users/{uid}` | Allowlisted app users (role, active, profile) |
+| `users/{uid}` | (legacy) old Firebase Auth profiles — unused |
+| `appUsers/{username}` | Simple login accounts (username + password hash) |
 
 ### `pmt/main` shape (`data` object)
 
@@ -189,26 +190,31 @@ Other clients ← onSnapshot(pmt/main) ← Object.assign(data) ← renderAll()
 
 ## 6. Auth & authorization
 
-### Roles
+### Model (simple Firestore login — no Firebase Auth)
+
+Users live in Firestore collection **`appUsers/{username}`**:
+
+```js
+{ username, name, role, active, passwordHash, createdAt, createdBy? }
+```
+
+Passwords are SHA-256 hashed in the browser before save/compare. Session is kept in `localStorage` (`juanpmt_session_v1`).
 
 | Role | Who | Capabilities |
 |------|-----|----------------|
-| **Superadmin** | Hardcoded `njcarlo@gmail.com` (+ `users/{uid}.role === 'superadmin'`) | Full app access; Settings → Users |
-| **User** | Created by superadmin | Full app data access; **cannot** manage users |
+| **Superadmin** | Username `njcarlo` | Full app + Settings → Users |
+| **User** | Created by superadmin | Full app data; cannot manage users |
 
 ### Flows
 
-1. **First boot (superadmin):** Login screen → “Create superadmin account” with `njcarlo@gmail.com` + password. Profile is upserted into `users/{uid}`.
-2. **Add teammate:** Superadmin → Settings → Users → name, email, temp password. Uses a **secondary Firebase app** so creating the Auth user does not sign the admin out (`auth.js` / `secondaryAuth`).
-3. **Sign-in:** Email/password → `ensureUserProfile`. Non-allowlisted or inactive users are signed out with an error.
-4. **Password reset:** “Forgot password?” → Firebase `sendPasswordResetEmail`.
+1. **First setup:** Login → “Create superadmin account” with username **`njcarlo`** + password.
+2. **Add teammate:** Settings → Users → display name, username, password.
+3. **Sign-in:** Username + password checked against `appUsers`.
+4. **Logout:** Clears local session.
 
-### Security rules (`firestore.rules`)
+### Security notes
 
-- `pmt/*` — read/write if **active** signed-in user (or hardcoded superadmin email).
-- `users/*` — read for self / active users; create/update/delete only **superadmin** (cannot delete self).
-
-**Important:** Email/Password must be enabled in Firebase Console → Authentication. Rules must be deployed (`firebase deploy --only firestore:rules`) — Hosting CI does **not** deploy rules today.
+Firestore rules currently allow public read/write on `pmt` and `appUsers` because there is no Firebase Auth token. The login screen is an app-level gate only — suitable for a trusted small team, not public internet hardening. Upgrade path: restore Firebase Auth or Cloud Functions for credential checks.
 
 ---
 
@@ -274,9 +280,8 @@ There is no test suite yet; verify manually: login, CRUD on a tab, Settings cate
 
 | Priority | Task | Detail |
 |----------|------|--------|
-| P0 | Enable Email/Password in Firebase Auth | Console → Authentication → Sign-in method |
-| P0 | Deploy Firestore rules | `firebase deploy --only firestore:rules` (not in Hosting CI yet) |
-| P0 | Create superadmin account in the app | Login → Create superadmin account → `njcarlo@gmail.com` |
+| P0 | Create superadmin in the app | Login → Create superadmin account → username `njcarlo` + password |
+| P0 | Deploy open Firestore rules | `firebase deploy --only firestore:rules` (needed for `appUsers` login without Firebase Auth) |
 | P0 | Add `FIREBASE_SERVICE_ACCOUNT_JUANPMT` secret | Otherwise Actions deploys fail — see `.github/FIREBASE_DEPLOY.md` |
 | P1 | Confirm live Hosting URL & Auth authorized domains | Include custom domain if any |
 
@@ -308,7 +313,7 @@ There is no test suite yet; verify manually: login, CRUD on a tab, Settings cate
 
 | Constant | Location | Value / meaning |
 |----------|----------|-----------------|
-| `SUPERADMIN_EMAIL` | `auth.js` / `firebase-config.js` | `njcarlo@gmail.com` |
+| `SUPERADMIN_USERNAME` | `auth.js` / `firebase-config.js` | `njcarlo` |
 | `STORAGE_KEY` | `data.js` | `juanpmt_data_v2` |
 | `DATA_DOC` | `firebase-config.js` | `doc(db, 'pmt', 'main')` |
 | `PROTECTED_OUT_CATEGORIES` | `data.js` | `Salary`, `Dividend` |

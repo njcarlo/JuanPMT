@@ -10,8 +10,8 @@ import * as partners  from './modules/partners.js';
 import * as settings  from './modules/settings.js';
 import { watchFirestore } from './data.js';
 import {
-  watchAuth, login, register, logout, resetPassword,
-  authErrorMessage, SUPERADMIN_EMAIL, currentUser
+  watchAuth, login, register, logout,
+  authErrorMessage, SUPERADMIN_USERNAME
 } from './auth.js';
 
 function closeModal(id) {
@@ -105,7 +105,7 @@ function showApp(user) {
   appEl.hidden = false;
   document.getElementById('userChipName').textContent = user.name || 'User';
   document.getElementById('userChipEmail').textContent =
-    (user.role === 'superadmin' ? 'Superadmin · ' : '') + (user.email || '');
+    (user.role === 'superadmin' ? 'Superadmin · ' : '') + (user.username || '');
 
   if (!appReady) {
     document.getElementById('tabs').addEventListener('click', e => {
@@ -153,20 +153,18 @@ function showLogin(err) {
 loginForm.addEventListener('submit', async e => {
   e.preventDefault();
   showLoginError('');
-  const email = document.getElementById('loginEmail').value.trim();
+  const username = document.getElementById('loginUsername').value.trim();
   const password = document.getElementById('loginPassword').value;
   const name = document.getElementById('loginName').value.trim();
   loginSubmitBtn.disabled = true;
   try {
+    let user;
     if (registerMode) {
-      if (email.toLowerCase() !== SUPERADMIN_EMAIL) {
-        throw new Error(`Self-registration is only for ${SUPERADMIN_EMAIL}. Ask a superadmin to add other users.`);
-      }
-      await register(email, password, name);
+      user = await register(username, password, name);
     } else {
-      await login(email, password);
+      user = await login(username, password);
     }
-    // watchAuth will show the app
+    showApp(user);
   } catch (err) {
     showLoginError(authErrorMessage(err));
   } finally {
@@ -176,20 +174,11 @@ loginForm.addEventListener('submit', async e => {
 
 toggleRegisterBtn.addEventListener('click', () => setRegisterMode(!registerMode));
 
-document.getElementById('forgotPasswordBtn').addEventListener('click', async () => {
-  const email = document.getElementById('loginEmail').value.trim() || prompt('Email for password reset:');
-  if (!email) return;
-  try {
-    await resetPassword(email);
-    showLoginError('');
-    alert('Password reset email sent (if that account exists).');
-  } catch (err) {
-    showLoginError(authErrorMessage(err));
-  }
-});
-
 document.getElementById('logoutBtn').addEventListener('click', async () => {
-  try { await logout(); } catch (_) {}
+  try {
+    await logout();
+  } catch (_) {}
+  showLogin();
 });
 
 watchAuth((user, err) => {
