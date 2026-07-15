@@ -20,6 +20,8 @@
   --radius: 10px;
 }
 * { box-sizing: border-box; }
+/* Author display rules (e.g. .login-screen { display:flex }) must not override [hidden] */
+[hidden] { display: none !important; }
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;

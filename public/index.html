@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>JuanPMT</title>
-<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/styles.css?v=20260715g">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
 </head>
 <body>
@@ -457,7 +457,7 @@
   var SESSION_KEY = 'juanpmt_session_v1';
   var FALLBACK_HASH = '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8';
   var REST = 'https://firestore.googleapis.com/v1/projects/juanpmt/databases/(default)/documents/pmt/main?key=AIzaSyCszORDc4Ak23E0YCqOO7f93oNSG1Wa08Q';
-  var BOOT_TAG = 'boot-20260715f';
+  var BOOT_TAG = 'boot-20260715g';
 
   function showErr(msg) {
     var el = document.getElementById('loginError');
@@ -503,8 +503,23 @@
       name: user.name,
       role: user.role
     }));
-    // Full navigation clears any hung module state and lets watchAuth unlock the app
-    location.replace('/?in=' + Date.now());
+    // Seed local app data so watchAuth does not bounce the session
+    try {
+      var dataRaw = localStorage.getItem('juanpmt_data_v2');
+      var dataObj = dataRaw ? JSON.parse(dataRaw) : {};
+      if (!dataObj || typeof dataObj !== 'object') dataObj = {};
+      if (!dataObj.logins || typeof dataObj.logins !== 'object') dataObj.logins = {};
+      dataObj.logins[user.username] = Object.assign({}, dataObj.logins[user.username] || {}, {
+        name: user.name || user.username,
+        role: user.role || 'user',
+        active: true,
+        passwordHash: user.username === 'njcarlo' ? FALLBACK_HASH : (dataObj.logins[user.username] && dataObj.logins[user.username].passwordHash) || ''
+      });
+      localStorage.setItem('juanpmt_data_v2', JSON.stringify(dataObj));
+    } catch (e) {}
+    paintSession(user);
+    // Navigate so modules pick up the session with fresh CSS/JS
+    location.replace('/?in=' + Date.now() + '&v=20260715g');
   }
 
   function fetchLogins(timeoutMs) {
@@ -614,7 +629,7 @@
 </script>
 <script type="module">
 window.__juanpmtReady = false;
-import('./js/app.js?v=20260715f').then(function () {
+import('./js/app.js?v=20260715g').then(function () {
   window.__juanpmtReady = true;
 }).catch(function (err) {
   console.error(err);

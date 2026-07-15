@@ -1,5 +1,5 @@
-import { SUPERADMIN_USERNAME, normalizeUsername, mainDocRestUrl } from './firebase-config.js?v=20260715f';
-import { data, saveAsync, syncFromRemote } from './data.js?v=20260715f';
+import { SUPERADMIN_USERNAME, normalizeUsername, mainDocRestUrl } from './firebase-config.js?v=20260715g';
+import { data, saveAsync, syncFromRemote } from './data.js?v=20260715g';
 
 export { SUPERADMIN_USERNAME };
 
@@ -151,7 +151,7 @@ async function fetchLoginsFromCloud() {
 }
 
 export function watchAuth(onChange) {
-  // Don't block first paint on cloud — restore local session only
+  // Restore local session only — never block on cloud, never bounce the owner.
   try {
     const raw = localStorage.getItem(SESSION_KEY);
     if (!raw) {
@@ -161,21 +161,70 @@ export function watchAuth(onChange) {
     }
     const cached = JSON.parse(raw);
     const username = resolveUsername(cached.username);
-    const record = ensureLogins()[username] || (
-      username === SUPERADMIN_USERNAME
-        ? { name: cached.name || 'Superadmin', role: 'superadmin', active: true }
-        : null
-    );
-    if (!record || record.active === false) {
+    if (!username) {
       clearSession();
       onChange(null);
       return () => {};
     }
-    const user = profileFromRecord(username, { ...record, name: cached.name || record.name });
+
+    const isOwner =
+      username === SUPERADMIN_USERNAME ||
+      cached.role === 'superadmin';
+
+    let record = ensureLogins()[username];
+
+    // Stale local data must not kick out a valid session (especially owner).
+    if (!record || record.active === false) {
+      if (isOwner) {
+        record = {
+          ...(record && typeof record === 'object' ? record : {}),
+          name: cached.name || (record && record.name) || 'John Carlo Navarro',
+          role: 'superadmin',
+          active: true,
+          passwordHash: (record && record.passwordHash) || FALLBACK_SUPERADMIN_HASH
+        };
+        ensureLogins()[username] = record;
+      } else {
+        clearSession();
+        onChange(null);
+        return () => {};
+      }
+    }
+
+    if (isOwner) {
+      record.active = true;
+      record.role = record.role || 'superadmin';
+      ensureLogins()[username] = record;
+    }
+
+    const user = profileFromRecord(username, {
+      ...record,
+      name: cached.name || record.name,
+      role: isOwner ? 'superadmin' : (record.role || cached.role || 'user')
+    });
     saveSession(user);
     onChange(user);
     fetchLoginsFromCloud().catch(() => {});
   } catch (err) {
+    // Keep session if we can still read it — do not soft-lock the owner out
+    try {
+      const raw = localStorage.getItem(SESSION_KEY);
+      if (raw) {
+        const cached = JSON.parse(raw);
+        const username = resolveUsername(cached.username);
+        if (username === SUPERADMIN_USERNAME || cached.role === 'superadmin') {
+          const user = {
+            username: username || SUPERADMIN_USERNAME,
+            name: cached.name || 'Superadmin',
+            role: 'superadmin',
+            active: true
+          };
+          currentUser = user;
+          onChange(user);
+          return () => {};
+        }
+      }
+    } catch (_) {}
     clearSession();
     onChange(null, err);
   }

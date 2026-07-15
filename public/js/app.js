@@ -8,11 +8,11 @@ import * as finance   from './modules/finance.js';
 import * as leads     from './modules/leads.js';
 import * as partners  from './modules/partners.js';
 import * as settings  from './modules/settings.js';
-import { watchFirestore } from './data.js?v=20260715f';
+import { watchFirestore } from './data.js?v=20260715g';
 import {
   watchAuth, login, register, logout,
   authErrorMessage, SUPERADMIN_USERNAME
-} from './auth.js?v=20260715f';
+} from './auth.js?v=20260715g';
 
 function closeModal(id) {
   document.getElementById(id).classList.remove('open');
@@ -229,7 +229,23 @@ watchAuth((user, err) => {
   window.__juanpmtReady = true;
   if (user) {
     showApp(user);
-  } else {
-    showLogin(err);
+    return;
   }
+  // If a session still exists, prefer it over bouncing to login (boot/module race)
+  try {
+    const raw = localStorage.getItem('juanpmt_session_v1');
+    if (raw) {
+      const cached = JSON.parse(raw);
+      if (cached && cached.username) {
+        showApp({
+          username: cached.username,
+          name: cached.name || cached.username,
+          role: cached.role || 'user',
+          active: true
+        });
+        return;
+      }
+    }
+  } catch (_) {}
+  showLogin(err);
 });
