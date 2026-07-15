@@ -1,9 +1,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import {
-  initializeFirestore, doc, setDoc, getDoc, onSnapshot
-} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getFirestore, doc, setDoc, getDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: 'AIzaSyCszORDc4Ak23E0YCqOO7f93oNSG1Wa08Q',
   authDomain: 'juanpmt.firebaseapp.com',
   projectId: 'juanpmt',
@@ -16,15 +14,16 @@ const firebaseConfig = {
 export const SUPERADMIN_USERNAME = 'njcarlo';
 
 const app = initializeApp(firebaseConfig);
-
-// Long polling avoids getDoc hanging forever on some browsers/networks
-export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true
-});
+export const db = getFirestore(app);
 
 export { doc, setDoc, getDoc, onSnapshot };
 export const DATA_DOC = doc(db, 'pmt', 'main');
 
 export function normalizeUsername(username) {
   return String(username || '').trim().toLowerCase();
+}
+
+/** REST URL for the main data document (works without Firebase Auth). */
+export function mainDocRestUrl() {
+  return `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/pmt/main?key=${firebaseConfig.apiKey}`;
 }

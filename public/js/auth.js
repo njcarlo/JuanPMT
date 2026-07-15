@@ -1,4 +1,6 @@
-import { SUPERADMIN_USERNAME, normalizeUsername, DATA_DOC, getDoc } from './firebase-config.js';
+import {
+  SUPERADMIN_USERNAME, normalizeUsername, mainDocRestUrl
+} from './firebase-config.js';
 import { data, saveAsync, syncFromRemote } from './data.js';
 
 export { SUPERADMIN_USERNAME };
@@ -16,7 +18,6 @@ function ensureLogins() {
   return data.logins;
 }
 
-/** Map common mistakes (email) to the real username. */
 function resolveUsername(raw) {
   let user = normalizeUsername(raw);
   if (user.includes('@')) {
@@ -34,6 +35,41 @@ function withTimeout(promise, ms, label) {
       e => { clearTimeout(t); reject(e); }
     );
   });
+}
+
+function fromFirestoreValue(val) {
+  if (!val || typeof val !== 'object') return val;
+  if ('stringValue' in val) return val.stringValue;
+  if ('booleanValue' in val) return val.booleanValue;
+  if ('integerValue' in val) return Number(val.integerValue);
+  if ('doubleValue' in val) return val.doubleValue;
+  if ('nullValue' in val) return null;
+  if ('mapValue' in val) {
+    const fields = val.mapValue.fields || {};
+    const out = {};
+    Object.keys(fields).forEach(k => { out[k] = fromFirestoreValue(fields[k]); });
+    return out;
+  }
+  if ('arrayValue' in val) {
+    return (val.arrayValue.values || []).map(fromFirestoreValue);
+  }
+  return null;
+}
+
+function toFirestoreValue(val) {
+  if (val === null || val === undefined) return { nullValue: null };
+  if (typeof val === 'boolean') return { booleanValue: val };
+  if (typeof val === 'number') {
+    return Number.isInteger(val) ? { integerValue: String(val) } : { doubleValue: val };
+  }
+  if (typeof val === 'string') return { stringValue: val };
+  if (Array.isArray(val)) return { arrayValue: { values: val.map(toFirestoreValue) } };
+  if (typeof val === 'object') {
+    const fields = {};
+    Object.keys(val).forEach(k => { fields[k] = toFirestoreValue(val[k]); });
+    return { mapValue: { fields } };
+  }
+  return { stringValue: String(val) };
 }
 
 export function isSuperadmin() {
@@ -75,21 +111,21 @@ function profileFromRecord(username, record) {
   };
 }
 
-/** Always read logins from Firestore for auth checks (ignore stale localStorage). */
+/** Read logins via Firestore REST (avoids SDK WebChannel hangs). */
 async function fetchLoginsFromCloud() {
-  const snap = await withTimeout(getDoc(DATA_DOC), CLOUD_TIMEOUT_MS, 'Database request');
-  if (!snap.exists()) return {};
-  const remote = snap.data() || {};
-  const logins = remote.logins && typeof remote.logins === 'object' && !Array.isArray(remote.logins)
-    ? remote.logins
-    : {};
-  data.logins = { ...logins };
+  const res = await withTimeout(fetch(mainDocRestUrl()), CLOUD_TIMEOUT_MS, 'Database request');
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => '');
+    throw new Error(`Database error (${res.status}). ${errBody.slice(0, 120)}`);
+  }
+  const doc = await res.json();
+  const fields = doc.fields || {};
+  const logins = fields.logins ? fromFirestoreValue(fields.logins) : {};
+  const safe = (logins && typeof logins === 'object' && !Array.isArray(logins)) ? logins : {};
+  data.logins = { ...safe };
   return data.logins;
 }
 
-/**
- * Restore session from localStorage and re-validate against cloud logins.
- */
 export function watchAuth(onChange) {
   (async () => {
     try {
@@ -149,15 +185,14 @@ export async function login(username, password) {
     throw new Error('Incorrect password.');
   }
 
-  // Full data sync can happen after UI unlocks
-  syncFromRemote().catch(() => {});
+  // Background full sync for the app after unlock
+  syncFromRemote().catch(err => console.warn('syncFromRemote failed', err));
 
   const profile = profileFromRecord(user, record);
   saveSession(profile);
   return profile;
 }
 
-/** First-time setup: create the superadmin account inside pmt/main.logins. */
 export async function register(username, password, name) {
   const user = resolveUsername(username);
   if (user !== SUPERADMIN_USERNAME) {
@@ -175,7 +210,6 @@ export async function register(username, password, name) {
 
   if (logins[user]) throw new Error('Superadmin already exists. Click “Back to sign in” and sign in.');
 
-  // Pull full remote doc before write so we don't wipe projects/tasks
   try { await syncFromRemote(); } catch (_) {}
 
   ensureLogins()[user] = {
@@ -203,9 +237,7 @@ export async function logout() {
 }
 
 export async function listUsers() {
-  try {
-    await fetchLoginsFromCloud();
-  } catch (_) {}
+  try { await fetchLoginsFromCloud(); } catch (_) {}
   const logins = ensureLogins();
   return Object.keys(logins)
     .map(username => {
@@ -293,9 +325,6 @@ export function authErrorMessage(err) {
   }
   if (/secure browser|crypto\.subtle/i.test(msg)) {
     return 'Open the site over HTTPS (e.g. https://juanpmt.web.app), then try again.';
-  }
-  if (/timed out/i.test(msg)) {
-    return msg;
   }
   return err?.message || 'Something went wrong.';
 }

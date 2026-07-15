@@ -17,14 +17,14 @@
       <p>Sign in to continue</p>
     </div>
     <div id="loginError" class="login-error" hidden></div>
-    <form id="loginForm" autocomplete="on">
+    <form id="loginForm" autocomplete="on" novalidate>
       <div class="field">
         <label for="loginUsername">Username</label>
-        <input type="text" id="loginUsername" required autocomplete="username" placeholder="username">
+        <input type="text" id="loginUsername" autocomplete="username" placeholder="njcarlo">
       </div>
       <div class="field">
         <label for="loginPassword">Password</label>
-        <input type="password" id="loginPassword" required autocomplete="current-password" minlength="4" placeholder="••••••••">
+        <input type="password" id="loginPassword" autocomplete="current-password" placeholder="••••••••">
       </div>
       <div class="field" id="loginNameField" hidden>
         <label for="loginName">Display name</label>
@@ -450,6 +450,46 @@
   </div>
 </div>
 
-<script type="module" src="js/app.js"></script>
+<script>
+// Immediate feedback even if the app module fails to load
+document.getElementById('loginForm')?.addEventListener('submit', function (e) {
+  e.preventDefault();
+  const err = document.getElementById('loginError');
+  const btn = document.getElementById('loginSubmitBtn');
+  if (btn && !btn.dataset.busy) {
+    btn.dataset.busy = '1';
+    btn.textContent = 'Signing in…';
+  }
+  if (err && err.hidden && !window.__juanpmtReady) {
+    // Module not ready yet — show status; app.js will take over when loaded
+    err.hidden = false;
+    err.textContent = 'Loading app…';
+  }
+}, true);
+</script>
+<script type="module">
+window.__juanpmtReady = false;
+import('./js/app.js').then(() => {
+  window.__juanpmtReady = true;
+  const err = document.getElementById('loginError');
+  if (err && err.textContent === 'Loading app…') {
+    err.hidden = true;
+    err.textContent = '';
+  }
+}).catch(err => {
+  console.error(err);
+  const el = document.getElementById('loginError');
+  if (el) {
+    el.hidden = false;
+    el.textContent = 'Failed to load app: ' + (err && err.message ? err.message : String(err));
+  }
+  const btn = document.getElementById('loginSubmitBtn');
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = 'Sign in';
+    delete btn.dataset.busy;
+  }
+});
+</script>
 </body>
 </html>

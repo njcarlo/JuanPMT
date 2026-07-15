@@ -156,10 +156,15 @@ function showLogin(err) {
 
 loginForm.addEventListener('submit', async e => {
   e.preventDefault();
+  e.stopPropagation();
   showLoginError('');
   const username = document.getElementById('loginUsername').value.trim();
   const password = document.getElementById('loginPassword').value;
   const name = document.getElementById('loginName').value.trim();
+  if (!username || !password) {
+    showLoginError('Enter username and password.');
+    return;
+  }
   const prevLabel = loginSubmitBtn.textContent;
   loginSubmitBtn.disabled = true;
   loginSubmitBtn.textContent = registerMode ? 'Creating…' : 'Signing in…';
@@ -190,6 +195,7 @@ document.getElementById('logoutBtn').addEventListener('click', async () => {
 });
 
 watchAuth((user, err) => {
+  window.__juanpmtReady = true;
   if (user) {
     showApp(user);
   } else {
