@@ -361,7 +361,7 @@ export async function listUsers() {
     });
 }
 
-export async function createAppUser({ username, password, name }) {
+export async function createAppUser({ username, password, name, role }) {
   if (!isSuperadmin()) throw new Error('Only the superadmin can add users.');
   const user = normalizeUsername(username);
   if (!user || !password) throw new Error('Username and password are required.');
@@ -369,7 +369,9 @@ export async function createAppUser({ username, password, name }) {
   if (!/^[a-z0-9._-]+$/.test(user)) {
     throw new Error('Username can only use letters, numbers, dot, underscore, or hyphen.');
   }
-  if (user === SUPERADMIN_USERNAME) throw new Error('That username is reserved for the superadmin.');
+  if (user === SUPERADMIN_USERNAME) throw new Error('That username is reserved for the owner account.');
+
+  const nextRole = role === 'superadmin' ? 'superadmin' : 'user';
 
   await softSync();
 
@@ -378,7 +380,7 @@ export async function createAppUser({ username, password, name }) {
 
   logins[user] = {
     name: (name || '').trim() || user,
-    role: 'user',
+    role: nextRole,
     active: true,
     passwordHash: await hashPassword(password),
     createdAt: new Date().toISOString(),
@@ -392,14 +394,29 @@ export async function createAppUser({ username, password, name }) {
     throw err;
   }
 
-  return { username: user, name: logins[user].name, role: 'user', active: true };
+  return { username: user, name: logins[user].name, role: nextRole, active: true };
+}
+
+export async function setUserRole(username, role) {
+  if (!isSuperadmin()) throw new Error('Only the superadmin can change roles.');
+  const user = normalizeUsername(username);
+  const nextRole = role === 'superadmin' ? 'superadmin' : 'user';
+  if (user === SUPERADMIN_USERNAME) throw new Error('Cannot change the owner account role.');
+  if (user === currentUser?.username) throw new Error('You cannot change your own role.');
+
+  await softSync();
+  const logins = ensureLogins();
+  if (!logins[user]) throw new Error('User not found.');
+  logins[user].role = nextRole;
+  logins[user].updatedAt = new Date().toISOString();
+  await saveLoginsAsync();
 }
 
 export async function setUserActive(username, active) {
   if (!isSuperadmin()) throw new Error('Only the superadmin can change users.');
   const user = normalizeUsername(username);
   if (user === currentUser?.username) throw new Error('You cannot deactivate yourself.');
-  if (user === SUPERADMIN_USERNAME) throw new Error('Cannot deactivate the superadmin.');
+  if (user === SUPERADMIN_USERNAME) throw new Error('Cannot deactivate the owner account.');
   await softSync();
   const logins = ensureLogins();
   if (!logins[user]) throw new Error('User not found.');
@@ -412,7 +429,7 @@ export async function removeUser(username) {
   if (!isSuperadmin()) throw new Error('Only the superadmin can remove users.');
   const user = normalizeUsername(username);
   if (user === currentUser?.username) throw new Error('You cannot remove yourself.');
-  if (user === SUPERADMIN_USERNAME) throw new Error('Cannot remove the superadmin.');
+  if (user === SUPERADMIN_USERNAME) throw new Error('Cannot remove the owner account.');
   await softSync();
   const logins = ensureLogins();
   if (!logins[user]) throw new Error('User not found.');

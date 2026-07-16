@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>JuanPMT</title>
-<link rel="stylesheet" href="css/styles.css?v=20260715h">
+<link rel="stylesheet" href="css/styles.css?v=20260715i">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
 </head>
 <body>
@@ -204,7 +204,7 @@
     <div class="card" id="settingsUsersCard" hidden>
       <h2>People who can log in</h2>
       <p class="card-desc">
-        Create usernames and passwords for teammates. Only you (superadmin) can manage access.
+        Create usernames and passwords for teammates. Check Superadmin to let them manage people and settings too. Your owner account (@njcarlo) stays protected.
       </p>
       <div class="settings-user-form">
         <div class="field">
@@ -218,6 +218,13 @@
         <div class="field">
           <label for="newUserPassword">Password</label>
           <input type="password" id="newUserPassword" placeholder="At least 4 characters" minlength="4" autocomplete="new-password">
+        </div>
+        <div class="field settings-user-role-field">
+          <label class="checkbox-label" for="newUserSuperadmin">
+            <input type="checkbox" id="newUserSuperadmin">
+            <span>Superadmin</span>
+          </label>
+          <div class="field-hint">Can manage people and settings</div>
         </div>
         <div class="settings-user-form-action">
           <button type="button" class="btn" id="addUserBtn" onclick="addUser()">+ Add person</button>
@@ -464,7 +471,7 @@
   var SESSION_KEY = 'juanpmt_session_v1';
   var FALLBACK_HASH = '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8';
   var REST = 'https://firestore.googleapis.com/v1/projects/juanpmt/databases/(default)/documents/pmt/main?key=AIzaSyCszORDc4Ak23E0YCqOO7f93oNSG1Wa08Q';
-  var BOOT_TAG = 'boot-20260715h';
+  var BOOT_TAG = 'boot-20260715i';
 
   function showErr(msg) {
     var el = document.getElementById('loginError');
@@ -526,7 +533,7 @@
     } catch (e) {}
     paintSession(user);
     // Navigate so modules pick up the session with fresh CSS/JS
-    location.replace('/?in=' + Date.now() + '&v=20260715h');
+    location.replace('/?in=' + Date.now() + '&v=20260715i');
   }
 
   function fetchLogins(timeoutMs) {
@@ -636,7 +643,7 @@
 </script>
 <script type="module">
 window.__juanpmtReady = false;
-import('./js/app.js?v=20260715h').then(function () {
+import('./js/app.js?v=20260715i').then(function () {
   window.__juanpmtReady = true;
 }).catch(function (err) {
   console.error(err);

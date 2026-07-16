@@ -4,7 +4,7 @@ import {
   PROTECTED_OUT_CATEGORIES
 } from '../data.js';
 import {
-  isSuperadmin, listUsers, createAppUser, setUserActive, removeUser,
+  isSuperadmin, listUsers, createAppUser, setUserActive, setUserRole, removeUser,
   authErrorMessage, SUPERADMIN_USERNAME, currentUser
 } from '../auth.js';
 
@@ -110,7 +110,8 @@ async function renderUsers() {
       return;
     }
     const rows = users.map(u => {
-      const isSA = u.role === 'superadmin' || u.username === SUPERADMIN_USERNAME;
+      const isOwner = u.username === SUPERADMIN_USERNAME;
+      const isSA = u.role === 'superadmin' || isOwner;
       const isSelf = currentUser && u.username === currentUser.username;
       const active = u.active !== false;
       const roleBadge = isSA
@@ -120,15 +121,23 @@ async function renderUsers() {
         ? `<span class="badge" style="background:var(--green-bg);color:var(--green)">Active</span>`
         : `<span class="badge" style="background:var(--red-bg);color:var(--red)">Inactive</span>`;
 
-      let actions = '';
-      if (!isSA && !isSelf) {
-        actions = active
-          ? `<button class="btn small secondary" onclick="toggleUserActive('${escapeHtml(u.username)}', false)">Deactivate</button>
-             <button class="btn small danger" onclick="deleteUser('${escapeHtml(u.username)}')">Remove</button>`
-          : `<button class="btn small secondary" onclick="toggleUserActive('${escapeHtml(u.username)}', true)">Reactivate</button>
-             <button class="btn small danger" onclick="deleteUser('${escapeHtml(u.username)}')">Remove</button>`;
-      } else if (isSA) {
-        actions = `<span style="color:var(--text-muted);font-size:12px">Protected</span>`;
+      const actionBtns = [];
+      if (!isOwner && !isSelf) {
+        if (isSA) {
+          actionBtns.push(`<button class="btn small secondary" onclick="changeUserRole('${escapeHtml(u.username)}', 'user')">Make user</button>`);
+        } else {
+          actionBtns.push(`<button class="btn small secondary" onclick="changeUserRole('${escapeHtml(u.username)}', 'superadmin')">Make superadmin</button>`);
+        }
+        if (active) {
+          actionBtns.push(`<button class="btn small secondary" onclick="toggleUserActive('${escapeHtml(u.username)}', false)">Deactivate</button>`);
+        } else {
+          actionBtns.push(`<button class="btn small secondary" onclick="toggleUserActive('${escapeHtml(u.username)}', true)">Reactivate</button>`);
+        }
+        actionBtns.push(`<button class="btn small danger" onclick="deleteUser('${escapeHtml(u.username)}')">Remove</button>`);
+      } else if (isOwner) {
+        actionBtns.push(`<span style="color:var(--text-muted);font-size:12px">Owner</span>`);
+      } else if (isSelf) {
+        actionBtns.push(`<span style="color:var(--text-muted);font-size:12px">You</span>`);
       }
 
       return `<tr>
@@ -138,7 +147,7 @@ async function renderUsers() {
         </td>
         <td>${roleBadge}</td>
         <td>${statusBadge}</td>
-        <td class="actions">${actions}</td>
+        <td class="actions">${actionBtns.join('')}</td>
       </tr>`;
     }).join('');
 
@@ -232,15 +241,36 @@ export async function addUser() {
   const name = document.getElementById('newUserName').value.trim();
   const username = document.getElementById('newUserUsername').value.trim();
   const password = document.getElementById('newUserPassword').value;
+  const asSuperadmin = !!document.getElementById('newUserSuperadmin')?.checked;
   if (!username || !password) { alert('Username and password are required.'); return; }
 
   try {
-    await createAppUser({ username, password, name });
+    await createAppUser({
+      username,
+      password,
+      name,
+      role: asSuperadmin ? 'superadmin' : 'user'
+    });
     document.getElementById('newUserName').value = '';
     document.getElementById('newUserUsername').value = '';
     document.getElementById('newUserPassword').value = '';
+    const cb = document.getElementById('newUserSuperadmin');
+    if (cb) cb.checked = false;
     await renderUsers();
-    alert('User created. They can sign in with that username and password.');
+    alert(asSuperadmin
+      ? 'Superadmin created. They can sign in and manage people/settings.'
+      : 'User created. They can sign in with that username and password.');
+  } catch (err) {
+    alert(authErrorMessage(err));
+  }
+}
+
+export async function changeUserRole(username, role) {
+  const label = role === 'superadmin' ? 'superadmin' : 'regular user';
+  if (!confirm(`Make @${username} a ${label}?`)) return;
+  try {
+    await setUserRole(username, role);
+    await renderUsers();
   } catch (err) {
     alert(authErrorMessage(err));
   }

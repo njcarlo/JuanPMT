@@ -69,6 +69,7 @@ window.renameCategory = (kind, index) => settings.renameCategory(kind, index);
 window.deleteCategory = (kind, index) => settings.deleteCategory(kind, index);
 window.addUser           = () => settings.addUser();
 window.toggleUserActive  = (uid, active) => settings.toggleUserActive(uid, active);
+window.changeUserRole    = (uid, role) => settings.changeUserRole(uid, role);
 window.deleteUser        = uid => settings.deleteUser(uid);
 
 const loginScreen = document.getElementById('loginScreen');
